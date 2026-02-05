@@ -1,0 +1,100 @@
+@import "tailwindcss";
+
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap');
+
+@theme {
+  --font-sans: 'Outfit', sans-serif;
+  
+  --color-bg-dark: #050511;
+  --color-bg-light: #120d2b;
+  --color-neon-primary: #d946ef;
+  --color-neon-secondary: #8b5cf6;
+  --color-neon-accent: #06b6d4;
+  --color-text-main: #f8fafc;
+  --color-text-muted: #94a3b8;
+  
+  /* Colors for glass effect */
+  --color-glass-border: rgba(255, 255, 255, 0.08);
+
+  --background-image-bg-gradient: radial-gradient(circle at 50% -20%, #2f1d58, #050511 60%);
+  
+  /* Shadows */
+  --shadow-glass: 0 8px 32px 0 rgba(0, 0, 0, 0.36);
+  --shadow-neon-glow: 0 0 10px rgba(217, 70, 239, 0.6);
+}
+
+@layer base {
+  body {
+    @apply font-sans bg-bg-dark text-text-main antialiased min-h-screen overflow-x-hidden flex justify-center bg-bg-gradient;
+  }
+}
+
+@layer components {
+  .app-container {
+    @apply w-full max-w-[650px] py-12 px-6 text-center flex flex-col items-center relative z-10;
+  }
+
+  .secondary-btn {
+    @apply bg-[rgba(139,92,246,0.1)] border border-neon-secondary text-neon-secondary px-5 py-2.5 rounded-full text-sm cursor-pointer font-semibold uppercase tracking-wider transition-all duration-300 hover:bg-neon-secondary hover:text-white hover:shadow-[0_0_20px_rgba(139,92,246,0.5)] hover:-translate-y-0.5;
+  }
+  
+  .input-base {
+    @apply bg-transparent border-0 border-b-2 border-glass-border text-white text-lg px-1 py-2.5 rounded-none transition-colors duration-300 focus:outline-none focus:border-neon-accent;
+  }
+
+  /* Custom Loading Spinner */
+  .spinner {
+      width: 40px;
+      height: 40px;
+      border: 3px solid rgba(255, 255, 255, 0.1);
+      border-top-color: var(--color-neon-primary);
+      border-radius: 50%;
+      animation: spin 0.8s cubic-bezier(0.68, -0.55, 0.265, 1.55) infinite;
+  }
+
+  @keyframes spin {
+      to { transform: rotate(360deg); }
+  }
+}
+
+/* Animations */
+@keyframes fadeScaleIn {
+    from { opacity: 0; transform: scale(0.9) translateY(20px); filter: blur(5px); }
+    to { opacity: 1; transform: scale(1) translateY(0); filter: blur(0); }
+}
+
+@keyframes slideUp {
+    from { opacity: 0; transform: translateY(50px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes pulse-ring {
+    0% { transform: scale(1); opacity: 0.8; }
+    100% { transform: scale(1.4); opacity: 0; }
+}
+
+@keyframes popIn {
+    0% { transform: scale(0); opacity: 0; }
+    100% { transform: scale(1); opacity: 1; }
+}
+
+.animate-fadeScaleIn {
+  animation: fadeScaleIn 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.animate-slideUp {
+  animation: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.animate-popIn {
+  animation: popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+@keyframes slideUpFixed {
+    from { transform: translateY(100%); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+}
+
+.animate-slideUpFixed {
+    animation: slideUpFixed 0.8s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
