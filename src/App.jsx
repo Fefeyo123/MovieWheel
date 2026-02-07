@@ -44,7 +44,24 @@ function AppContent() {
                 setMovies(prev => [...prev, normalized]);
             })
             .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'movies' }, (payload) => {
-                setMovies(prev => prev.map(m => m.id === payload.new.id ? { ...payload.new, genre: parseGenre(payload.new.genre) } : m));
+                setMovies(prev => {
+                    const index = prev.findIndex(m => m.id === payload.new.id);
+                    if (index === -1) return prev; // Not found
+
+                    const currentMovie = prev[index];
+                    const newData = { ...payload.new, genre: parseGenre(payload.new.genre) };
+
+                    // RACE CONDITION FIX:
+                    // If the critical data (status) is already the same, ignore this update
+                    // to prevent a "flicker" or overwriting a more recent local optimistic update.
+                    if (currentMovie.status === newData.status) {
+                        return prev;
+                    }
+
+                    const newMovies = [...prev];
+                    newMovies[index] = newData;
+                    return newMovies;
+                });
             })
             .subscribe();
 
@@ -73,10 +90,21 @@ function AppContent() {
         setSpinTrigger(prev => prev + 1);
     };
 
+    const timeoutRef = React.useRef(null);
+    
+    // Cleanup on unmount
+    useEffect(() => {
+        return () => {
+             if (timeoutRef.current) clearTimeout(timeoutRef.current);
+        };
+    }, []);
+
     const onGenreSpinEnd = React.useCallback((genre) => {
         setSelectedGenre(genre);
         
-        setTimeout(() => {
+        if (timeoutRef.current) clearTimeout(timeoutRef.current);
+        
+        timeoutRef.current = setTimeout(() => {
             setPhase('movies');
             setSpinTrigger(0); 
         }, 800);
@@ -85,7 +113,9 @@ function AppContent() {
     const onMovieSpinEnd = React.useCallback((item) => {
         const resultText = item.value || item; 
         
-        setTimeout(() => {
+        if (timeoutRef.current) clearTimeout(timeoutRef.current);
+
+        timeoutRef.current = setTimeout(() => {
             const collectionMatch = queuedMovies.filter(m => {
                  const isGenreMatch = m.genre.includes(selectedGenre);
                  return m.collection_name === resultText && isGenreMatch;
@@ -107,6 +137,7 @@ function AppContent() {
     }, [queuedMovies, selectedGenre]);
 
     const reset = () => {
+        if (timeoutRef.current) clearTimeout(timeoutRef.current);
         setPhase('genre');
         setSelectedGenre(null);
         setSelectedMovie(null);
@@ -116,6 +147,15 @@ function AppContent() {
     const markAsWatched = async () => {
         if (!selectedMovie) return;
         
+        // Optimistic Update
+        const previousMovies = [...movies];
+        setMovies(prev => prev.map(m => 
+            m.id === selectedMovie.id ? { ...m, status: 'watched' } : m
+        ));
+
+        // Start reset flow optimistically as well for snappiness
+        reset();
+
         const { error } = await supabase
             .from('movies')
             .update({ status: 'watched' })
@@ -124,13 +164,20 @@ function AppContent() {
         if (error) {
             console.error('Error marking as watched:', error);
             alert("Failed to mark as watched.");
-        } else {
-            reset();
-        }
+            // Revert on error
+            setMovies(previousMovies);
+        } 
+        // No else needed, we already reset
     };
 
     const handleToggleWatched = async (movie) => {
         const newStatus = movie.status === 'watched' ? 'queued' : 'watched';
+        
+        // Optimistic Update
+        const previousMovies = [...movies];
+        setMovies(prev => prev.map(m => 
+            m.id === movie.id ? { ...m, status: newStatus } : m
+        ));
         
         const { error } = await supabase
             .from('movies')
@@ -140,12 +187,17 @@ function AppContent() {
         if (error) {
             console.error('Error updating status:', error);
             alert("Failed to update status.");
-        } else {
+            // Revert on error
+            setMovies(previousMovies);
         }
     };
 
     const handleRemoveMovie = async (movie) => {
         if (!window.confirm(`Remove "${movie.title}" from the queue?`)) return;
+
+        // Optimistic Update
+        const previousMovies = [...movies];
+        setMovies(prev => prev.filter(m => m.id !== movie.id));
 
         const { error } = await supabase
             .from('movies')
@@ -155,8 +207,8 @@ function AppContent() {
         if (error) {
             console.error("Error deleting movie:", error);
             alert("Failed to delete movie.");
-        } else {
-            setMovies(prev => prev.filter(m => m.id !== movie.id));
+            // Revert
+            setMovies(previousMovies);
         }
     };
 
