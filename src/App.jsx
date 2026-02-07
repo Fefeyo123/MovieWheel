@@ -218,7 +218,7 @@ function AppContent() {
     };
 
     return (
-        <div className="app-container relative h-full min-h-screen overflow-hidden">
+        <div className="app-container flex flex-col h-full min-h-screen overflow-hidden text-text-main font-outfit">
             <Header 
                 users={THE_BOIS}
                 queueCount={queuedMovies.length}
@@ -227,18 +227,15 @@ function AppContent() {
                 hasAvailableGenres={availableGenres.length > 0}
             />
 
-            <main className="w-full flex-grow relative">
+            <main className="w-full flex-grow relative flex flex-col items-center justify-center">
                 {/* UNIFIED WHEEL CONTAINER */}
                 <motion.div 
                     layout
                     transition={{ type: "spring", stiffness: 40, damping: 15 }}
-                    className={`fixed z-20
-                        /* Position & Core Transform */
-                        left-1/2 -translate-x-1/2 
+                    className={`z-20
                         ${isGenrePhase 
-                            ? 'top-[55%] sm:top-[60%] -translate-y-1/2 w-[90vw] h-[90vw] max-w-[400px] max-h-[400px]' 
-                            : 'top-[100%] sm:top-[100%] -translate-y-[50%] w-[220vw] h-[220vw] max-w-[800px] max-h-[800px] sm:w-[min(1000px,85vh)] sm:h-[min(1000px,85vh)] sm:max-w-none sm:max-h-none'
-
+                            ? 'relative w-auto h-[80%] aspect-square max-h-[400px]' 
+                            : 'absolute left-1/2 -translate-x-1/2 top-full -translate-y-[30%] w-[115vh] h-[115vh] sm:w-[min(1000px,115vh)] sm:h-[min(1000px,115vh)]'
                         }
                     `}
                 >
@@ -278,7 +275,7 @@ function AppContent() {
                             /* Dynamic Styles based on Phase */
                             ${isGenrePhase 
                                 ? 'top-1/2 w-[90px] h-[90px] sm:w-[110px] sm:h-[110px]'
-                                : 'top-[-90px] w-[80px] h-[80px]'
+                                : 'top-[-13%] w-[80px] h-[80px] sm:top-[-90px] sm:w-[110px] sm:h-[110px]'
                             }
                         `}
                     >

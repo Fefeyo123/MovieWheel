@@ -222,7 +222,7 @@ const WheelCanvas = ({ items, onSpinEnd, isSpinning, spinTrigger, width = 500, h
                  const drawW = innerRadius * 2;
                  const drawH = drawW * imgRatio;
                  
-                 ctx.drawImage(cImg, -drawW/2, -drawH/2, drawW, drawH);
+                 ctx.drawImage(cImg, -drawW/2, -innerRadius, drawW, drawH);
                  
                  // Vignette
                  const gradient = ctx.createRadialGradient(0, 0, innerRadius * 0.7, 0, 0, innerRadius);

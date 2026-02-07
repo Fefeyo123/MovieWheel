@@ -27,11 +27,15 @@
   body {
     @apply font-sans bg-bg-dark text-text-main antialiased min-h-screen overflow-x-hidden flex justify-center bg-bg-gradient;
   }
+  
+  #root {
+     @apply w-full;
+  }
 }
 
 @layer components {
   .app-container {
-    @apply w-full max-w-[650px] py-6 px-4 sm:py-12 sm:px-6 text-center flex flex-col items-center relative z-10 mx-auto;
+    @apply w-full py-6 px-4 sm:py-12 sm:px-6 text-center flex flex-col items-center relative z-10 mx-auto;
   }
 
   .secondary-btn {
