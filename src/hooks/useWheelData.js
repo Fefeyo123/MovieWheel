@@ -1,24 +1,23 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useMemo } from 'react';
 
 const useWheelData = (movies, selectedGenre) => {
-    const [availableGenres, setAvailableGenres] = useState([]);
-
     // 1. Filter movies that are in the queue (not watched)
     const queuedMovies = useMemo(() => {
         return movies.filter(m => !m.status || m.status === 'queued');
     }, [movies]);
 
     // 2. Derive available genres from queued movies
-    useEffect(() => {
+    const availableGenres = useMemo(() => {
         if (queuedMovies.length > 0) {
             const dbGenres = new Set();
             queuedMovies.forEach(m => {
-                m.genre.forEach(g => dbGenres.add(g));
+                if (Array.isArray(m.genre)) {
+                     m.genre.forEach(g => dbGenres.add(g));
+                }
             });
-            setAvailableGenres(Array.from(dbGenres));
-        } else {
-            setAvailableGenres([]);
-        }
+            return Array.from(dbGenres);
+        } 
+        return []; // Return empty array if no queued movies
     }, [queuedMovies]);
 
     // 3. Grouping Logic for Wheel (Movies + Collections)

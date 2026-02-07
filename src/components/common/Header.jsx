@@ -1,17 +1,23 @@
 import React from 'react';
+import { useUI } from '../../context/UIContext';
 import { motion } from 'framer-motion';
 
 const Header = ({ 
-    selectedUser, 
-    onUserChange, 
     users, 
-    onAddMovie, 
-    onShowQueue, 
     queueCount, 
     isGenrePhase, 
     selectedGenre, 
     hasAvailableGenres 
 }) => {
+    const { 
+        selectedUser, 
+        setSelectedUser, 
+        openAddModal, 
+        openListModal 
+    } = useUI();
+
+    const onUserChange = (e) => setSelectedUser(e.target.value);
+
     return (
         <header className="mb-4 sm:mb-8 w-full z-50 relative px-4">
             <div className="flex flex-col sm:flex-row justify-center items-center gap-4 mb-6 sm:mb-6 w-full animate-[fadeIn_0.5s_ease-out]">
@@ -36,7 +42,7 @@ const Header = ({
                 <div className="flex gap-4 w-full sm:w-auto justify-center">
                     <motion.button 
                         className="secondary-btn flex-1 sm:flex-none flex items-center justify-center gap-2 group" 
-                        onClick={onAddMovie}
+                        onClick={openAddModal}
                         whileHover={{ scale: 1.05 }}
                         whileTap={{ scale: 0.95 }}
                         transition={{ type: "spring", stiffness: 400, damping: 10 }}
@@ -45,7 +51,7 @@ const Header = ({
                     </motion.button>
                     <motion.button 
                         className="secondary-btn flex-1 sm:flex-none flex items-center justify-center gap-2" 
-                        onClick={onShowQueue}
+                        onClick={openListModal}
                         whileHover={{ scale: 1.05 }}
                         whileTap={{ scale: 0.95 }}
                         transition={{ type: "spring", stiffness: 400, damping: 10 }}

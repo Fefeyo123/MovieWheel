@@ -8,42 +8,28 @@ const MovieCard = ({
     mobileActions, 
     meta, 
     posterSize = "w-[50px] h-[75px] sm:w-[60px] sm:h-[90px]",
-    titleSize = "text-base sm:text-xl",
-    genresMap // Optional: specific for AddMovieModal if needed, otherwise uses movie.genre
+    titleSize = "text-base sm:text-xl"
 }) => {
     
     // Helper to render genres safely
     const renderGenres = () => {
-         if (movie.genre_ids && genresMap) {
-             // Logic from AddMovieModal for raw TMDB results
-             return movie.genre_ids.slice(0, 3).map(id => {
-                const genreName = genresMap[id];
-                if (!genreName) return null;
-                return (
-                    <span key={id} className="bg-white/5 text-white/90 text-[11px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border border-white/10 shadow-sm inline-block">
-                        {genreName}
-                    </span>
-                );
-            });
-         }
-         
-         if (Array.isArray(movie.genre)) {
+        if (Array.isArray(movie.genre)) {
              return movie.genre.map(g => (
                 <span key={g} className="bg-white/5 text-white/90 text-[11px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border border-white/10 shadow-sm">
                     {g}
                 </span>
             ));
-         }
+        }
 
-         if (movie.genre) {
+        if (typeof movie.genre === 'string') {
              return (
                 <span className="bg-white/5 text-white/90 text-[11px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border border-white/10 shadow-sm">
                     {movie.genre}
                 </span>
             );
-         }
+        }
 
-         return null;
+        return null;
     };
 
     return (

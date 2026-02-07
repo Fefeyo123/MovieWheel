@@ -49,3 +49,22 @@ export const getCollectionDetails = async (id) => {
         return null;
     }
 };
+
+export const normalizeTmdbMovie = (movie, genresMap) => {
+    // Map genre_ids to strings using the provided map
+    const genres = (movie.genre_ids || []).map(id => genresMap[id]).filter(Boolean);
+    
+    return {
+        id: movie.id,
+        title: movie.title,
+        poster_path: movie.poster_path,
+        release_date: movie.release_date,
+        genre: genres, // Array of strings
+        original_language: movie.original_language,
+        overview: movie.overview,
+        vote_average: movie.vote_average,
+        // Keep original IDs for reference if needed
+        genre_ids: movie.genre_ids,
+        popularity: movie.popularity
+    };
+};

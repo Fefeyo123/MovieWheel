@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { searchMovies, getGenres, getMovieDetails, getCollectionDetails } from '../../utils/tmdb';
+import { searchMovies, getGenres, getMovieDetails, getCollectionDetails, normalizeTmdbMovie } from '../../utils/tmdb';
 import { supabase } from '../../utils/supabaseClient';
 import WarningModal from './WarningModal';
 import MovieCard from '../common/MovieCard';
@@ -40,7 +40,9 @@ const AddMovieModal = ({ onClose, currentUser }) => {
                 searchMovies(safeQuery).then(res => {
                     // Sort by popularity to ensure hits like "WALL-E" come up first
                     const sorted = res.sort((a, b) => b.popularity - a.popularity);
-                    setResults(sorted);
+                    // Normalize results immediately
+                    const normalizedResults = sorted.map(movie => normalizeTmdbMovie(movie, genresMap));
+                    setResults(normalizedResults);
                     setLoading(false);
                 });
             } else {
@@ -274,7 +276,6 @@ const AddMovieModal = ({ onClose, currentUser }) => {
                             movie={movie}
                             posterSize="w-[60px] h-[90px] sm:w-[70px] sm:h-[105px]"
                             titleSize="text-base sm:text-xl"
-                            genresMap={genresMap}
                             onClick={() => handleAdd(movie)}
                             mobileActions={
                                 <motion.button 

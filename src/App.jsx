@@ -1,28 +1,25 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import WheelCanvas from './components/wheel/WheelCanvas';
-import AddMovieModal from './components/modals/AddMovieModal';
-import MovieListModal from './components/modals/MovieListModal';
+import ModalsContainer from './components/common/ModalsContainer';
 import Header from './components/common/Header';
 import ResultModal from './components/modals/ResultModal';
 import { supabase } from './utils/supabaseClient';
 import { THE_BOIS, GENRE_COLORS } from './utils/constants';
 import { parseGenre } from './utils/helpers';
 import useWheelData from './hooks/useWheelData';
+import { UIProvider } from './context/UIContext';
 import './index.css';
 
-function App() {
+function AppContent() {
     const [phase, setPhase] = useState('genre'); // genre | movies | result
     const [selectedGenre, setSelectedGenre] = useState(null);
     const [selectedMovie, setSelectedMovie] = useState(null);
     const [spinTrigger, setSpinTrigger] = useState(0);
     const [wheelOpacity, setWheelOpacity] = useState(1);
-    const [showAddModal, setShowAddModal] = useState(false);
-    const [showListModal, setShowListModal] = useState(false);
     
     // Data
     const [movies, setMovies] = useState([]);
-    const [selectedUser, setSelectedUser] = useState(localStorage.getItem('movieUser') || '');
 
     // Custom Hook for Wheel Data
     const { 
@@ -56,10 +53,6 @@ function App() {
         };
     }, []);
 
-    // Use filtered queuedMovies for availableGenres calculation instead of all movies
-    // This logic is moved inside the useMemo below which handles queuedMovies derivation
-
-
     const fetchMovies = async () => {
         const { data, error } = await supabase
             .from('movies')
@@ -74,12 +67,6 @@ function App() {
             }));
             setMovies(normalized);
         }
-    };
-
-    const handleUserChange = (e) => {
-        const user = e.target.value;
-        setSelectedUser(user);
-        localStorage.setItem('movieUser', user);
     };
 
     const handleSpin = () => {
@@ -138,10 +125,6 @@ function App() {
             console.error('Error marking as watched:', error);
             alert("Failed to mark as watched.");
         } else {
-            // Optimistic update handled by subscription or we could do it manually here if subscription is slow,
-            // but for now relying on subscription/fetch or simple local update if needed.
-            // Actually, let's update local state immediately for better UX
-            setMovies(prev => prev.map(m => m.id === selectedMovie.id ? { ...m, status: 'watched' } : m));
             reset();
         }
     };
@@ -158,7 +141,6 @@ function App() {
             console.error('Error updating status:', error);
             alert("Failed to update status.");
         } else {
-            setMovies(prev => prev.map(m => m.id === movie.id ? { ...m, status: newStatus } : m));
         }
     };
 
@@ -178,16 +160,10 @@ function App() {
         }
     };
 
-
-
     return (
         <div className="app-container relative h-full min-h-screen overflow-hidden">
             <Header 
-                selectedUser={selectedUser}
-                onUserChange={handleUserChange}
                 users={THE_BOIS}
-                onAddMovie={() => setShowAddModal(true)}
-                onShowQueue={() => setShowListModal(true)}
                 queueCount={queuedMovies.length}
                 isGenrePhase={isGenrePhase}
                 selectedGenre={selectedGenre}
@@ -289,19 +265,20 @@ function App() {
                 )}
             </main>
             
-            {showAddModal && (
-                <AddMovieModal onClose={() => setShowAddModal(false)} currentUser={selectedUser} />
-            )}
-            
-            {showListModal && (
-                <MovieListModal 
-                    movies={movies} 
-                    onClose={() => setShowListModal(false)} 
-                    onDelete={handleRemoveMovie}
-                    onToggleWatched={handleToggleWatched}
-                />
-            )}
+            <ModalsContainer 
+                movies={movies}
+                onDelete={handleRemoveMovie}
+                onToggleWatched={handleToggleWatched}
+            />
         </div>
+    );
+}
+
+function App() {
+    return (
+        <UIProvider>
+            <AppContent />
+        </UIProvider>
     );
 }
 

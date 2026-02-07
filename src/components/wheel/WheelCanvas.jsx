@@ -1,9 +1,11 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { WHEEL_COLORS } from '../../utils/constants';
 import { adjustColorBrightness, wrapText, getIndexAtTop } from '../../utils/helpers';
 
 const WheelCanvas = ({ items, onSpinEnd, isSpinning, spinTrigger, width = 500, height = 500, fontSize, colors, isDonut = false }) => {
     const canvasRef = useRef(null);
+    const offscreenCanvasRef = useRef(null); // Offscreen canvas for static wheel
+    
     const stateRef = useRef({
         angle: 0,
         velocity: 0,
@@ -11,58 +13,72 @@ const WheelCanvas = ({ items, onSpinEnd, isSpinning, spinTrigger, width = 500, h
         lastFrameTime: 0
     });
 
-    const [images, setImages] = React.useState({});
+    const [images, setImages] = useState({});
 
-    // Load images when items change
+    // Load images when items change, with caching
     useEffect(() => {
         const loadImages = async () => {
-            const newImages = {};
-            const promises = items.map((item) => {
-                if (item && typeof item === 'object' && item.posterPath) {
-                    return new Promise((resolve) => {
-                        const img = new Image();
-                        const path = item.posterPath.startsWith('/') ? item.posterPath : `/${item.posterPath}`;
-                        img.src = `https://image.tmdb.org/t/p/w500${path}`;
-                        
-                        img.onload = () => {
-                            const key = item.value || item.label;
-                            if (key) newImages[key] = img;
-                            resolve();
-                        };
-                        img.onerror = () => {
-                            resolve(); 
-                        };
-                    });
-                }
-                return Promise.resolve();
+            const newImagesToProps = {};
+            const itemsWithPosters = items.filter(item => item && typeof item === 'object' && item.posterPath);
+
+            // Identify which images we actually need to load
+            const promises = itemsWithPosters.map((item) => {
+                const key = item.value || item.label;
+                
+                // If we already have this image loaded, skip it
+                if (images[key]) return Promise.resolve();
+
+                return new Promise((resolve) => {
+                    const img = new Image();
+                    const path = item.posterPath.startsWith('/') ? item.posterPath : `/${item.posterPath}`;
+                    img.src = `https://image.tmdb.org/t/p/w500${path}`;
+                    
+                    img.onload = () => {
+                        newImagesToProps[key] = img;
+                        resolve();
+                    };
+                    img.onerror = () => {
+                        resolve(); 
+                    };
+                });
             });
 
             await Promise.all(promises);
-            setImages(newImages);
+
+            // Only update state if we actually loaded something new
+            if (Object.keys(newImagesToProps).length > 0) {
+                setImages(prev => ({ ...prev, ...newImagesToProps }));
+            }
         };
 
         loadImages();
-    }, [items]);
+    }, [items, images]); // 'images' dependency prevents stale closure, but logic prevents inf loop
 
-    // Draw the wheel
-    const draw = (ctx, angle) => {
-        const size = ctx.canvas.width;
+
+    // Draw the STATIC part of the wheel to the offscreen canvas
+    const drawStaticWheel = () => {
+        if (!offscreenCanvasRef.current) {
+            offscreenCanvasRef.current = document.createElement('canvas');
+        }
+        
+        const ctx = offscreenCanvasRef.current.getContext('2d');
+        const size = width; // Use prop width/height
+        
+        // Update offscreen canvas size if needed (clears it too)
+        if (offscreenCanvasRef.current.width !== size || offscreenCanvasRef.current.height !== size) {
+             offscreenCanvasRef.current.width = size;
+             offscreenCanvasRef.current.height = size;
+        } else {
+             ctx.clearRect(0, 0, size, size);
+        }
+
         const center = size / 2;
         const radius = size / 2 - 20;
         const arc = (2 * Math.PI) / items.length;
-        
         const chord = 2 * radius * Math.sin(arc / 2);
-        const expectedPosterHeight = chord * 1.5;
         
-        let calculatedInner = radius - expectedPosterHeight;
-        if (calculatedInner < 50) calculatedInner = 50;
-        
-        const innerRadius = isDonut ? calculatedInner : (size > 800 ? 80 : 45);
-
-        ctx.clearRect(0, 0, size, size);
         ctx.save();
         ctx.translate(center, center);
-        ctx.rotate(angle);
 
         // 1. Draw Outer Rim / Bezel
         ctx.save();
@@ -84,7 +100,8 @@ const WheelCanvas = ({ items, onSpinEnd, isSpinning, spinTrigger, width = 500, h
         items.forEach((item, i) => {
             const segmentAngle = i * arc;
             const color = effectiveColors[i % effectiveColors.length];
-            const img = images[item.value || item.label];
+            const itemKey = typeof item === 'object' ? (item.value || item.label) : item;
+            const img = images[itemKey];
 
             // 2. Draw Segment with Radial Gradient
             ctx.beginPath();
@@ -144,8 +161,39 @@ const WheelCanvas = ({ items, onSpinEnd, isSpinning, spinTrigger, width = 500, h
              ctx.restore();
         });
         
-        ctx.restore(); // End rotation
-        
+        ctx.restore(); // End translation
+    };
+
+    // Re-render static wheel when dependencies change
+    useEffect(() => {
+        drawStaticWheel();
+    }, [items, images, width, height, colors, fontSize, isDonut]);
+
+
+    // Main Draw Function (Animation Loop) - Draws the transformed static image
+    const draw = (ctx, angle) => {
+        const size = ctx.canvas.width;
+        const center = size / 2;
+        const radius = size / 2 - 20;
+
+        ctx.clearRect(0, 0, size, size);
+
+        // 1. Draw Offscreen Static Wheel (Rotated)
+        if (offscreenCanvasRef.current) {
+            ctx.save();
+            ctx.translate(center, center);
+            ctx.rotate(angle);
+            // Draw the pre-rendered wheel, centered
+            ctx.drawImage(offscreenCanvasRef.current, -center, -center);
+            ctx.restore();
+        }
+
+        const chord = 2 * radius * Math.sin((2 * Math.PI) / items.length / 2);
+        const expectedPosterHeight = chord * 1.5;
+        let calculatedInner = radius - expectedPosterHeight;
+        if (calculatedInner < 50) calculatedInner = 50;
+        const innerRadius = isDonut ? calculatedInner : (size > 800 ? 80 : 45);
+
 
         if (isDonut) {
             // Donut: Find current winner to show in center
