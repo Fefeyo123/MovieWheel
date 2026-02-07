@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { searchMovies, getGenres, getMovieDetails, getCollectionDetails } from '../utils/tmdb';
-import { supabase } from '../utils/supabaseClient';
+import { searchMovies, getGenres, getMovieDetails, getCollectionDetails } from '../../utils/tmdb';
+import { supabase } from '../../utils/supabaseClient';
 import WarningModal from './WarningModal';
+import MovieCard from '../common/MovieCard';
+import ModalWrapper from './ModalWrapper';
 
 const THE_BOIS = ["Foo", "Lex", "Yan", "Jer", "Brt", "Gustav"];
 
@@ -226,7 +228,10 @@ const AddMovieModal = ({ onClose, currentUser }) => {
     };
 
     return (
-        <div className="fixed inset-0 w-screen h-screen bg-[#050511]/70 backdrop-blur-md flex items-center justify-center z-[100] animate-[fadeIn_0.3s_ease]">
+        <ModalWrapper 
+            onClose={onClose}
+            className="w-full max-w-[800px] max-h-[85vh] flex flex-col p-4 sm:p-8"
+        >
             {warning && (
                 <WarningModal 
                     type={warning.type} 
@@ -238,8 +243,7 @@ const AddMovieModal = ({ onClose, currentUser }) => {
                 />
             )}
             
-            <div className="glass-panel max-w-[500px] w-[95%] sm:w-[90%] p-4 sm:p-8 max-h-[85vh] flex flex-col animate-slideUp">
-                <div className="flex justify-between items-center mb-4 sm:mb-6">
+            <div className="flex justify-between items-center mb-4 sm:mb-6">
                     <h2 className="m-0 text-xl sm:text-2xl font-bold bg-gradient-to-r from-white to-text-muted bg-clip-text text-transparent">Add Movie</h2>
                     <button onClick={onClose} className="bg-transparent border-none text-2xl text-text-muted cursor-pointer transition-all duration-300 p-2 rounded-full hover:text-white hover:bg-white/10 hover:rotate-90">&times;</button>
                 </div>
@@ -265,47 +269,23 @@ const AddMovieModal = ({ onClose, currentUser }) => {
 
                 <div className="flex flex-col gap-3 overflow-y-auto pr-1 -mr-1 custom-scrollbar flex-1 pb-4">
                     {results.map(movie => (
-                        <div key={movie.id} className="group relative flex flex-row items-start gap-3 sm:gap-5 p-3 sm:p-4 rounded-xl sm:rounded-2xl transition-all duration-300 border border-transparent hover:bg-white/5 hover:border-white/10 hover:-translate-x-[-4px]">
-                             {/* Mobile Add Button - Absolute */}
-                             <motion.button 
-                                onClick={(e) => { e.stopPropagation(); handleAdd(movie); }}
-                                whileTap={{ scale: 0.9 }}
-                                className="sm:hidden absolute top-2 right-2 w-[28px] h-[28px] rounded-full border border-neon-secondary/30 bg-neon-secondary/10 text-neon-secondary text-lg font-light cursor-pointer flex items-center justify-center shrink-0 z-20"
-                            >
-                                +
-                            </motion.button>
-
-                            {movie.poster_path ? (
-                                <img 
-                                    src={`https://image.tmdb.org/t/p/w154${movie.poster_path}`}
-                                    alt={movie.title}
-                                    className="w-[60px] h-[90px] sm:w-[70px] sm:h-[105px] object-cover rounded-lg shrink-0 shadow-md group-hover:shadow-[0_8px_20px_rgba(0,0,0,0.4)] transition-all duration-300 block"
-                                />
-                            ) : (
-                                <div className="w-[60px] h-[90px] sm:w-[70px] sm:h-[105px] bg-white/5 rounded-lg flex items-center justify-center text-2xl sm:text-3xl text-text-muted shrink-0 border border-dashed border-white/10">?</div>
-                            )}
-                            <div className="flex-1 min-w-0 text-left flex flex-col justify-center gap-1">
-                                <div className="pr-8 sm:pr-0">
-                                    <h4 className="m-0 text-base sm:text-xl font-bold text-white tracking-wide truncate group-hover:text-neon-secondary transition-colors duration-300 drop-shadow-sm">{movie.title}</h4>
-                                </div>
-                                <div className="flex flex-wrap gap-1.5 sm:gap-2 items-center text-sm opacity-90 mt-0.5 sm:mt-1">
-                                    {movie.genre_ids && movie.genre_ids.slice(0, 3).map(id => {
-                                        const genreName = genresMap[id];
-                                        if (!genreName) return null;
-                                        return (
-                                            <span key={id} className="bg-white/5 text-white/90 text-[11px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border border-white/10 shadow-sm inline-block">
-                                                {genreName}
-                                            </span>
-                                        );
-                                    })}
-                                    {movie.release_date && (
-                                        <span className="text-xs text-text-muted font-mono opacity-70 ml-1 inline-block">{movie.release_date.split('-')[0]}</span>
-                                    )}
-                                </div>
-                            </div>
-                            
-                            {/* Desktop Add Button */}
-                            <div className="hidden sm:flex items-center pl-4 border-l border-white/5 ml-2 self-stretch">
+                        <MovieCard
+                            key={movie.id}
+                            movie={movie}
+                            posterSize="w-[60px] h-[90px] sm:w-[70px] sm:h-[105px]"
+                            titleSize="text-base sm:text-xl"
+                            genresMap={genresMap}
+                            onClick={() => handleAdd(movie)}
+                            mobileActions={
+                                <motion.button 
+                                    onClick={(e) => { e.stopPropagation(); handleAdd(movie); }}
+                                    whileTap={{ scale: 0.9 }}
+                                    className="sm:hidden absolute top-2 right-2 w-[28px] h-[28px] rounded-full border border-neon-secondary/30 bg-neon-secondary/10 text-neon-secondary text-lg font-light cursor-pointer flex items-center justify-center shrink-0 z-20"
+                                >
+                                    +
+                                </motion.button>
+                            }
+                            actions={
                                 <motion.button 
                                     onClick={() => handleAdd(movie)}
                                     whileHover={{ scale: 1.1, backgroundColor: "rgba(139, 92, 246, 1)", color: "#fff", boxShadow: "0 0 15px rgba(139, 92, 246, 0.6)" }}
@@ -314,8 +294,8 @@ const AddMovieModal = ({ onClose, currentUser }) => {
                                 >
                                     +
                                 </motion.button>
-                            </div>
-                        </div>
+                            }
+                        />
                     ))}
                     {results.length === 0 && query.length > 2 && !loading && (
                         <div className="text-text-muted my-8 text-center flex flex-col items-center gap-2 opacity-60">
@@ -330,8 +310,7 @@ const AddMovieModal = ({ onClose, currentUser }) => {
                         </div>
                     )}
                 </div>
-            </div>
-        </div>
+        </ModalWrapper>
     );
 };
 

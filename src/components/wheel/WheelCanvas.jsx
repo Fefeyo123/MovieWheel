@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from 'react';
-import { WHEEL_COLORS } from '../utils/constants';
-import { adjustColorBrightness, wrapText, getIndexAtTop } from '../utils/helpers';
+import { WHEEL_COLORS } from '../../utils/constants';
+import { adjustColorBrightness, wrapText, getIndexAtTop } from '../../utils/helpers';
 
 const WheelCanvas = ({ items, onSpinEnd, isSpinning, spinTrigger, width = 500, height = 500, fontSize, colors, isDonut = false }) => {
     const canvasRef = useRef(null);

@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import WheelCanvas from './components/WheelCanvas';
-import AddMovieModal from './components/AddMovieModal';
-import MovieListModal from './components/MovieListModal';
-import Header from './components/Header';
-import ResultModal from './components/ResultModal';
+import WheelCanvas from './components/wheel/WheelCanvas';
+import AddMovieModal from './components/modals/AddMovieModal';
+import MovieListModal from './components/modals/MovieListModal';
+import Header from './components/common/Header';
+import ResultModal from './components/modals/ResultModal';
 import { supabase } from './utils/supabaseClient';
 import { THE_BOIS, GENRE_COLORS } from './utils/constants';
 import { parseGenre } from './utils/helpers';
+import useWheelData from './hooks/useWheelData';
 import './index.css';
 
 function App() {
@@ -21,8 +22,20 @@ function App() {
     
     // Data
     const [movies, setMovies] = useState([]);
-    const [availableGenres, setAvailableGenres] = useState([]);
     const [selectedUser, setSelectedUser] = useState(localStorage.getItem('movieUser') || '');
+
+    // Custom Hook for Wheel Data
+    const { 
+        queuedMovies, 
+        availableGenres, 
+        effectiveMovieItems 
+    } = useWheelData(movies, selectedGenre);
+
+    const genreItems = availableGenres;
+    
+    const currentWheelItems = phase === 'genre' ? (genreItems.length > 0 ? genreItems : ['Add Movies']) : effectiveMovieItems;
+
+    const isGenrePhase = phase === 'genre';
 
     useEffect(() => {
         fetchMovies();
@@ -30,15 +43,11 @@ function App() {
         const subscription = supabase
             .channel('public:movies')
             .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'movies' }, (payload) => {
-                if (payload.new.status === 'queued' || !payload.new.status) {
-                    const normalized = { ...payload.new, genre: parseGenre(payload.new.genre) };
-                    setMovies(prev => [...prev, normalized]);
-                }
+                const normalized = { ...payload.new, genre: parseGenre(payload.new.genre) };
+                setMovies(prev => [...prev, normalized]);
             })
             .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'movies' }, (payload) => {
-                if (payload.new.status !== 'queued') {
-                    setMovies(prev => prev.filter(m => m.id !== payload.new.id));
-                }
+                setMovies(prev => prev.map(m => m.id === payload.new.id ? { ...payload.new, genre: parseGenre(payload.new.genre) } : m));
             })
             .subscribe();
 
@@ -47,23 +56,14 @@ function App() {
         };
     }, []);
 
-    useEffect(() => {
-        if (movies.length > 0) {
-            const dbGenres = new Set();
-            movies.forEach(m => {
-                m.genre.forEach(g => dbGenres.add(g));
-            });
-            setAvailableGenres(Array.from(dbGenres));
-        } else {
-            setAvailableGenres([]);
-        }
-    }, [movies]);
+    // Use filtered queuedMovies for availableGenres calculation instead of all movies
+    // This logic is moved inside the useMemo below which handles queuedMovies derivation
+
 
     const fetchMovies = async () => {
         const { data, error } = await supabase
             .from('movies')
-            .select('*')
-            .or('status.eq.queued,status.is.null');
+            .select('*');
 
         if (error) {
             console.error('Error fetching movies:', error);
@@ -99,7 +99,7 @@ function App() {
         const resultText = item.value || item; 
         
         setTimeout(() => {
-            const collectionMatch = movies.filter(m => {
+            const collectionMatch = queuedMovies.filter(m => {
                  const isGenreMatch = m.genre.includes(selectedGenre);
                  return m.collection_name === resultText && isGenreMatch;
             });
@@ -112,12 +112,12 @@ function App() {
                 });
                 setSelectedMovie(sorted[0]);
             } else {
-                const movie = movies.find(m => m.title === resultText);
+                const movie = queuedMovies.find(m => m.title === resultText);
                 setSelectedMovie(movie); 
             }
             setPhase('result');
         }, 1000);
-    }, [movies, selectedGenre]);
+    }, [queuedMovies, selectedGenre]);
 
     const reset = () => {
         setPhase('genre');
@@ -138,8 +138,27 @@ function App() {
             console.error('Error marking as watched:', error);
             alert("Failed to mark as watched.");
         } else {
-            setMovies(prev => prev.filter(m => m.id !== selectedMovie.id));
+            // Optimistic update handled by subscription or we could do it manually here if subscription is slow,
+            // but for now relying on subscription/fetch or simple local update if needed.
+            // Actually, let's update local state immediately for better UX
+            setMovies(prev => prev.map(m => m.id === selectedMovie.id ? { ...m, status: 'watched' } : m));
             reset();
+        }
+    };
+
+    const handleToggleWatched = async (movie) => {
+        const newStatus = movie.status === 'watched' ? 'queued' : 'watched';
+        
+        const { error } = await supabase
+            .from('movies')
+            .update({ status: newStatus })
+            .eq('id', movie.id);
+
+        if (error) {
+            console.error('Error updating status:', error);
+            alert("Failed to update status.");
+        } else {
+            setMovies(prev => prev.map(m => m.id === movie.id ? { ...m, status: newStatus } : m));
         }
     };
 
@@ -159,60 +178,7 @@ function App() {
         }
     };
 
-    const genreItems = availableGenres;
-    
-    // Grouping Logic for Wheel
-    const { moviesInGenre, wheelItemsSet } = React.useMemo(() => {
-        const filtered = movies.filter(m => m.genre.includes(selectedGenre));
 
-        const itemsSet = new Set();
-        
-        const collectionGroups = {};
-        filtered.forEach(m => {
-            if (m.collection_name) {
-                if (!collectionGroups[m.collection_name]) {
-                    collectionGroups[m.collection_name] = [];
-                }
-                collectionGroups[m.collection_name].push(m);
-            }
-        });
-
-        filtered.forEach(m => {
-            if (m.collection_name && collectionGroups[m.collection_name].length > 1) {
-                itemsSet.add(m.collection_name);
-            } else {
-                itemsSet.add(m.title);
-            }
-        });
-        
-        return { moviesInGenre: filtered, wheelItemsSet: itemsSet };
-    }, [movies, selectedGenre]);
-
-    const effectiveMovieItems = React.useMemo(() => {
-        const items = [];
-        if (wheelItemsSet.size > 0) {
-            wheelItemsSet.forEach(itemTitle => {
-                const match = moviesInGenre.find(m => m.collection_name === itemTitle || m.title === itemTitle);
-                
-                if (match) {
-                    items.push({
-                        type: 'movie_or_collection',
-                        label: itemTitle, 
-                        posterPath: match.poster_path,
-                        value: itemTitle 
-                    });
-                }
-            });
-        } else {
-            items.push({ type: 'text', label: "No Movies", value: "No Movies" });
-            items.push({ type: 'text', label: "Add Some!", value: "Add Some!" });
-        }
-        return items;
-    }, [wheelItemsSet, moviesInGenre]);
-    
-    const currentWheelItems = phase === 'genre' ? (genreItems.length > 0 ? genreItems : ['Add Movies']) : effectiveMovieItems;
-
-    const isGenrePhase = phase === 'genre';
 
     return (
         <div className="app-container relative h-full min-h-screen overflow-hidden">
@@ -222,7 +188,7 @@ function App() {
                 users={THE_BOIS}
                 onAddMovie={() => setShowAddModal(true)}
                 onShowQueue={() => setShowListModal(true)}
-                queueCount={movies.length}
+                queueCount={queuedMovies.length}
                 isGenrePhase={isGenrePhase}
                 selectedGenre={selectedGenre}
                 hasAvailableGenres={availableGenres.length > 0}
@@ -238,7 +204,8 @@ function App() {
                         left-1/2 -translate-x-1/2 
                         ${isGenrePhase 
                             ? 'top-[55%] sm:top-[60%] -translate-y-1/2 w-[90vw] h-[90vw] max-w-[400px] max-h-[400px]' 
-                            : 'top-[100%] sm:top-[100%] -translate-y-[50%] w-[220vw] h-[220vw] max-w-[800px] max-h-[800px] sm:w-[1000px] sm:h-[1000px] sm:max-w-none sm:max-h-none'
+                            : 'top-[100%] sm:top-[100%] -translate-y-[50%] w-[220vw] h-[220vw] max-w-[800px] max-h-[800px] sm:w-[min(1000px,85vh)] sm:h-[min(1000px,85vh)] sm:max-w-none sm:max-h-none'
+
                         }
                     `}
                 >
@@ -331,6 +298,7 @@ function App() {
                     movies={movies} 
                     onClose={() => setShowListModal(false)} 
                     onDelete={handleRemoveMovie}
+                    onToggleWatched={handleToggleWatched}
                 />
             )}
         </div>
