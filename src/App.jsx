@@ -1,42 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import WheelCanvas from './components/WheelCanvas';
 import AddMovieModal from './components/AddMovieModal';
 import MovieListModal from './components/MovieListModal';
+import Header from './components/Header';
+import ResultModal from './components/ResultModal';
 import { supabase } from './utils/supabaseClient';
+import { THE_BOIS, GENRE_COLORS } from './utils/constants';
+import { parseGenre } from './utils/helpers';
 import './index.css';
-
-const THE_BOIS = ["Foo", "Lex", "Yan", "Jer", "Brt", "Gustav"];
-
-const GENRE_COLORS = [
-    '#EF4444', // Red
-    '#F97316', // Orange
-    '#F59E0B', // Amber
-    '#84CC16', // Lime
-    '#10B981', // Emerald
-    '#06B6D4', // Cyan
-    '#3B82F6', // Blue
-    '#8B5CF6', // Violet
-    '#D946EF', // Fuchsia
-    '#F43F5E', // Rose
-];
-
-const parseGenre = (genreData) => {
-    if (!genreData) return [];
-    if (Array.isArray(genreData)) return genreData;
-    if (typeof genreData === 'string') {
-        if (genreData.startsWith('[') || genreData.startsWith('{')) {
-            try {
-                const parsed = JSON.parse(genreData);
-                if (Array.isArray(parsed)) return parsed;
-            } catch (e) {
-                // ignore
-            }
-        }
-        return [genreData]; // Treat as single genre
-    }
-    return [];
-};
 
 function App() {
     const [phase, setPhase] = useState('genre'); // genre | movies | result
@@ -55,7 +27,6 @@ function App() {
     useEffect(() => {
         fetchMovies();
 
-        // Realtime subscription
         const subscription = supabase
             .channel('public:movies')
             .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'movies' }, (payload) => {
@@ -65,7 +36,6 @@ function App() {
                 }
             })
             .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'movies' }, (payload) => {
-                // If it was updated to something other than queued, remove it
                 if (payload.new.status !== 'queued') {
                     setMovies(prev => prev.filter(m => m.id !== payload.new.id));
                 }
@@ -79,7 +49,6 @@ function App() {
 
     useEffect(() => {
         if (movies.length > 0) {
-            // Extract unique genres from DB movies (already normalized)
             const dbGenres = new Set();
             movies.forEach(m => {
                 m.genre.forEach(g => dbGenres.add(g));
@@ -90,10 +59,7 @@ function App() {
         }
     }, [movies]);
 
-
-
     const fetchMovies = async () => {
-        // Filter where status is 'queued' OR status is null (for backward compatibility if migration script missed some or default didn't apply)
         const { data, error } = await supabase
             .from('movies')
             .select('*')
@@ -102,7 +68,6 @@ function App() {
         if (error) {
             console.error('Error fetching movies:', error);
         } else {
-            // Normalize genres immediately
             const normalized = (data || []).map(m => ({
                 ...m,
                 genre: parseGenre(m.genre)
@@ -134,14 +99,12 @@ function App() {
         const resultText = item.value || item; 
         
         setTimeout(() => {
-            // Optimization: Find if any movie has this collection_name
             const collectionMatch = movies.filter(m => {
                  const isGenreMatch = m.genre.includes(selectedGenre);
                  return m.collection_name === resultText && isGenreMatch;
             });
             
             if (collectionMatch.length > 0) {
-                // It is a collection!
                 const sorted = [...collectionMatch].sort((a, b) => {
                     if (!a.release_date) return -1;
                     if (!b.release_date) return 1;
@@ -149,7 +112,6 @@ function App() {
                 });
                 setSelectedMovie(sorted[0]);
             } else {
-                // Standalone movie
                 const movie = movies.find(m => m.title === resultText);
                 setSelectedMovie(movie); 
             }
@@ -158,17 +120,10 @@ function App() {
     }, [movies, selectedGenre]);
 
     const reset = () => {
-        // Reverse sequence for reset
-        // setWheelOpacity(0); // Allow visible transition back
-        // setTimeout(() => {
-            setPhase('genre');
-            setSelectedGenre(null);
-            setSelectedMovie(null);
-            setSpinTrigger(0); 
-            // setTimeout(() => {
-            //     setWheelOpacity(1);
-            // }, 300);
-        // }, 300);
+        setPhase('genre');
+        setSelectedGenre(null);
+        setSelectedMovie(null);
+        setSpinTrigger(0); 
     };
 
     const markAsWatched = async () => {
@@ -183,7 +138,6 @@ function App() {
             console.error('Error marking as watched:', error);
             alert("Failed to mark as watched.");
         } else {
-            // Optimistic update
             setMovies(prev => prev.filter(m => m.id !== selectedMovie.id));
             reset();
         }
@@ -201,23 +155,18 @@ function App() {
             console.error("Error deleting movie:", error);
             alert("Failed to delete movie.");
         } else {
-            // Optimistic update
             setMovies(prev => prev.filter(m => m.id !== movie.id));
         }
     };
 
-    // Derived state for the current wheels
     const genreItems = availableGenres;
     
     // Grouping Logic for Wheel
     const { moviesInGenre, wheelItemsSet } = React.useMemo(() => {
-        // 1. Filter by Genre
         const filtered = movies.filter(m => m.genre.includes(selectedGenre));
 
-        // 2. Group by Collection
         const itemsSet = new Set();
         
-        // First, group movies by collection
         const collectionGroups = {};
         filtered.forEach(m => {
             if (m.collection_name) {
@@ -261,80 +210,23 @@ function App() {
         return items;
     }, [wheelItemsSet, moviesInGenre]);
     
-    // Determine which items to show based on phase
-    // If phase is 'genre', show genreItems (strings)
-    // If phase is 'movies' or 'result', show effectiveMovieItems (objects)
     const currentWheelItems = phase === 'genre' ? (genreItems.length > 0 ? genreItems : ['Add Movies']) : effectiveMovieItems;
 
-    // Transition Logic
     const isGenrePhase = phase === 'genre';
-    const isResultPhase = phase === 'result';
 
     return (
         <div className="app-container relative h-full min-h-screen overflow-hidden">
-            <header className="mb-4 sm:mb-8 w-full z-50 relative px-4">
-                <div className="flex flex-col sm:flex-row justify-center items-center gap-4 mb-6 sm:mb-6 w-full animate-[fadeIn_0.5s_ease-out]">
-                    <motion.div 
-                        className="relative group w-full sm:w-auto"
-                        whileHover={{ scale: 1.02 }}
-                        transition={{ type: "spring", stiffness: 400, damping: 10 }}
-                    >
-                        <select 
-                            value={selectedUser} 
-                            onChange={handleUserChange}
-                            className="appearance-none w-full sm:w-auto pl-6 pr-12 py-3 bg-white/5 text-neon-secondary border border-neon-secondary/30 rounded-full text-sm font-bold uppercase tracking-wider backdrop-blur-md transition-all duration-300 cursor-pointer outline-none hover:bg-neon-secondary/10 hover:border-neon-secondary hover:shadow-[0_0_20px_rgba(139,92,246,0.2)] focus:bg-neon-secondary/10 focus:border-neon-secondary"
-                        >
-                            <option value="">Who are you?</option>
-                            {THE_BOIS.map(boi => <option key={boi} value={boi}>{boi}</option>)}
-                        </select>
-                        <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-neon-secondary transition-transform duration-300 group-hover:translate-x-1">
-                          <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/></svg>
-                        </div>
-                    </motion.div>
-                    
-                    <div className="flex gap-4 w-full sm:w-auto justify-center">
-                        <motion.button 
-                            className="secondary-btn flex-1 sm:flex-none flex items-center justify-center gap-2 group" 
-                            onClick={() => setShowAddModal(true)}
-                            whileHover={{ scale: 1.05 }}
-                            whileTap={{ scale: 0.95 }}
-                            transition={{ type: "spring", stiffness: 400, damping: 10 }}
-                        >
-                            <span className="text-lg leading-none group-hover:scale-125 transition-transform duration-300">+</span> Add Movie
-                        </motion.button>
-                        <motion.button 
-                            className="secondary-btn flex-1 sm:flex-none flex items-center justify-center gap-2" 
-                            onClick={() => setShowListModal(true)}
-                            whileHover={{ scale: 1.05 }}
-                            whileTap={{ scale: 0.95 }}
-                            transition={{ type: "spring", stiffness: 400, damping: 10 }}
-                        >
-                            <span className="material-symbols-outlined text-[18px]">list</span>
-                            Queue ({movies.length})
-                        </motion.button>
-                    </div>
-                </div>
-                
-                <h1 className="text-4xl sm:text-6xl font-extrabold bg-gradient-to-br from-[#e879f9] via-neon-secondary to-[#22d3ee] bg-clip-text text-transparent mb-2 tracking-tighter drop-shadow-[0_0_15px_rgba(139,92,246,0.4)]">
-                    NextUp
-                </h1>
-                <p className="text-text-muted text-base sm:text-lg font-light tracking-wide">
-                    Spin to decide your movie night.
-                </p>
-                
-                {/* Header Text Transition */}
-                <div className={`transition-all duration-500 mt-4 sm:mt-8 ${!isGenrePhase ? 'opacity-0 translate-y-[-20px] pointer-events-none absolute w-full' : 'opacity-100 translate-y-0 relative'}`}>
-                     <h2 className="font-normal text-2xl sm:text-3xl text-text-main">
-                        {availableGenres.length > 0 ? "Pick a Genre" : "Add movies to start!"}
-                    </h2>
-                </div>
-
-                <div className={`transition-all duration-500 mt-2 ${isGenrePhase ? 'opacity-0 translate-y-[20px] pointer-events-none absolute w-full' : 'opacity-100 translate-y-0 relative'}`}>
-                      <h2 className="font-normal text-3xl sm:text-4xl text-text-main">
-                        <span className="text-neon-primary font-bold drop-shadow-[0_0_10px_rgba(217,70,239,0.6)]">{selectedGenre}</span> Movies
-                     </h2>
-                </div>
-            </header>
+            <Header 
+                selectedUser={selectedUser}
+                onUserChange={handleUserChange}
+                users={THE_BOIS}
+                onAddMovie={() => setShowAddModal(true)}
+                onShowQueue={() => setShowListModal(true)}
+                queueCount={movies.length}
+                isGenrePhase={isGenrePhase}
+                selectedGenre={selectedGenre}
+                hasAvailableGenres={availableGenres.length > 0}
+            />
 
             <main className="w-full flex-grow relative">
                 {/* UNIFIED WHEEL CONTAINER */}
@@ -345,8 +237,8 @@ function App() {
                         /* Position & Core Transform */
                         left-1/2 -translate-x-1/2 
                         ${isGenrePhase 
-                            ? 'top-[55%] sm:top-[60%] -translate-y-1/2 w-[90vw] h-[90vw] max-w-[400px] max-h-[400px]'  // Genre: Responsive center
-                            : 'top-[100%] sm:top-[100%] -translate-y-[50%] w-[220vw] h-[220vw] max-w-[800px] max-h-[800px] sm:w-[1000px] sm:h-[1000px] sm:max-w-none sm:max-h-none' // Movies: Large partial wheel
+                            ? 'top-[55%] sm:top-[60%] -translate-y-1/2 w-[90vw] h-[90vw] max-w-[400px] max-h-[400px]' 
+                            : 'top-[100%] sm:top-[100%] -translate-y-[50%] w-[220vw] h-[220vw] max-w-[800px] max-h-[800px] sm:w-[1000px] sm:h-[1000px] sm:max-w-none sm:max-h-none'
                         }
                     `}
                 >
@@ -369,12 +261,10 @@ function App() {
                             items={currentWheelItems} 
                             onSpinEnd={isGenrePhase ? onGenreSpinEnd : onMovieSpinEnd}
                             spinTrigger={spinTrigger}
-                            // Use consistent high res for sharpness during scale, referencing the container's max or current size logic via CSS mostly, but canvas needs explicit internal resolution.
-                            // We keep 1200 for high DPI look.
                             width={1200}
                             height={1200}
-                            fontSize={isGenrePhase ? 80 : 24} // Increased genre text size, keep movie text standard
-                            colors={isGenrePhase ? GENRE_COLORS : undefined} // Custom colors for genre wheel
+                            fontSize={isGenrePhase ? 80 : 24}
+                            colors={isGenrePhase ? GENRE_COLORS : undefined}
                             isDonut={!isGenrePhase}
                         />
                     </div>
@@ -424,27 +314,11 @@ function App() {
                 </motion.div>
 
                 {phase === 'result' && (
-                    <div className="fixed inset-0 w-screen h-screen bg-[#050511]/70 backdrop-blur-md flex items-center justify-center z-[100] animate-[fadeIn_0.3s_ease]">
-                        <div className="bg-slate-800/70 p-12 rounded-3xl text-center shadow-glass border border-glass-border max-w-[500px] w-[90%] animate-slideUp relative overflow-hidden before:content-[''] before:absolute before:top-0 before:left-0 before:right-0 before:h-[2px] before:bg-gradient-to-r before:from-transparent before:via-neon-primary before:to-transparent">
-                            <h3 className="text-base uppercase tracking-[3px] text-text-muted mb-2">You're watching:</h3>
-                            {selectedMovie?.poster_path && (
-                                <img 
-                                    src={`https://image.tmdb.org/t/p/w500${selectedMovie.poster_path}`} 
-                                    alt={selectedMovie.title} 
-                                    className="w-[200px] rounded-xl shadow-[0_0_20px_rgba(0,0,0,0.5)] mb-6 border-2 border-glass-border mx-auto"
-                                />
-                            )}
-                            <h1 className="text-5xl mb-10 leading-tight text-white drop-shadow-[0_0_20px_var(--neon-secondary)]">{selectedMovie?.title}</h1>
-                            <div className="flex gap-4 justify-center">
-                                <button onClick={markAsWatched} className="secondary-btn bg-neon-primary text-white border-none hover:bg-neon-primary hover:shadow-[0_0_20px_rgba(217,70,239,0.5)]">
-                                    Mark Watched
-                                </button>
-                                <button onClick={reset} className="secondary-btn">
-                                    Spin Again
-                                </button>
-                            </div>
-                        </div>
-                    </div>
+                    <ResultModal 
+                        selectedMovie={selectedMovie} 
+                        onMarkWatched={markAsWatched} 
+                        onSpinAgain={reset} 
+                    />
                 )}
             </main>
             

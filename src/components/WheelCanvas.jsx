@@ -1,15 +1,6 @@
 import React, { useEffect, useRef } from 'react';
-
-const COLORS = [
-    '#d946ef', // Neon Fuchsia
-    '#8b5cf6', // Neon Violet
-    '#06b6d4', // Neon Cyan
-    '#f43f5e', // Neon Rose
-    '#3b82f6', // Bright Blue
-    '#10b981', // Emerald
-    '#ec4899', // Pink
-    '#f59e0b', // Amber
-];
+import { WHEEL_COLORS } from '../utils/constants';
+import { adjustColorBrightness, wrapText, getIndexAtTop } from '../utils/helpers';
 
 const WheelCanvas = ({ items, onSpinEnd, isSpinning, spinTrigger, width = 500, height = 500, fontSize, colors, isDonut = false }) => {
     const canvasRef = useRef(null);
@@ -24,38 +15,29 @@ const WheelCanvas = ({ items, onSpinEnd, isSpinning, spinTrigger, width = 500, h
 
     // Load images when items change
     useEffect(() => {
-        console.log("WheelCanvas: items changed", items);
         const loadImages = async () => {
             const newImages = {};
             const promises = items.map((item) => {
-                // Check if item is object and has posterPath
                 if (item && typeof item === 'object' && item.posterPath) {
                     return new Promise((resolve) => {
                         const img = new Image();
-                        // No crossOrigin needed for display-only
-                        // Ensure proper path construction
                         const path = item.posterPath.startsWith('/') ? item.posterPath : `/${item.posterPath}`;
                         img.src = `https://image.tmdb.org/t/p/w500${path}`;
                         
                         img.onload = () => {
-                            console.log("Image loaded:", item.label);
                             const key = item.value || item.label;
                             if (key) newImages[key] = img;
                             resolve();
                         };
-                        img.onerror = (e) => {
-                            console.error("Image load failed:", item.label, e);
+                        img.onerror = () => {
                             resolve(); 
                         };
                     });
-                } else {
-                    if (item && typeof item === 'object') console.log("Skipping image load (no posterPath):", item.label);
                 }
                 return Promise.resolve();
             });
 
             await Promise.all(promises);
-            console.log("Setting images state with count:", Object.keys(newImages).length);
             setImages(newImages);
         };
 
@@ -64,27 +46,17 @@ const WheelCanvas = ({ items, onSpinEnd, isSpinning, spinTrigger, width = 500, h
 
     // Draw the wheel
     const draw = (ctx, angle) => {
-        const size = ctx.canvas.width; // Use actual canvas width
+        const size = ctx.canvas.width;
         const center = size / 2;
-        const radius = size / 2 - 20; // Reduced radius for outer rim
+        const radius = size / 2 - 20;
         const arc = (2 * Math.PI) / items.length;
         
-        // Calculate innerRadius based on poster fit
-        // We want the inner hole to touch the bottom of the posters.
-        // Poster fits top edge width (chord).
-        // chord = 2 * R * sin(theta/2)
         const chord = 2 * radius * Math.sin(arc / 2);
-        // Standard poster ratio is 2:3 (width:height) -> height = width * 1.5
-        // If we scale to fit width: height = chord * 1.5
         const expectedPosterHeight = chord * 1.5;
         
-        // innerRadius = External Radius - Image Height
-        // If items are few, chord is huge -> height is huge -> innerRadius small (or negative).
-        // Clamp it to be safe, but try to follow rule.
         let calculatedInner = radius - expectedPosterHeight;
-        if (calculatedInner < 50) calculatedInner = 50; // Minimum hole size
+        if (calculatedInner < 50) calculatedInner = 50;
         
-        // Use this for the donut hole
         const innerRadius = isDonut ? calculatedInner : (size > 800 ? 80 : 45);
 
         ctx.clearRect(0, 0, size, size);
@@ -107,7 +79,7 @@ const WheelCanvas = ({ items, onSpinEnd, isSpinning, spinTrigger, width = 500, h
         ctx.stroke();
         ctx.restore();
 
-        const effectiveColors = colors && colors.length > 0 ? colors : COLORS;
+        const effectiveColors = colors && colors.length > 0 ? colors : WHEEL_COLORS;
 
         items.forEach((item, i) => {
             const segmentAngle = i * arc;
@@ -122,36 +94,19 @@ const WheelCanvas = ({ items, onSpinEnd, isSpinning, spinTrigger, width = 500, h
             
             ctx.save();
             if (img) {
-                // Clip to segment
                 ctx.clip();
-                
-                 // Draw Image
-                // "Shrink the images so the top edge fits" (User request)
-                // "No distortion" -> Preserve Aspect Ratio
-                
-                // Scale needed to cover width exactly (chord)
                 const scale = chord / img.width;
-                
                 const imgW = img.width * scale;
                 const imgH = img.height * scale;
                 
-                // Rotate to center the image in the wedge segment
-                // Standard system: X is 0.
-                // We rotate to the center of the wedge (segmentAngle + arc/2)
                 ctx.rotate(segmentAngle + arc / 2);
-                // Then rotate 90deg so the X axis becomes Tangential and Y axis becomes Radial Inwards
                 ctx.rotate(Math.PI/2); 
                 
-                // Draw image from rim (-radius) inwards
-                // x: centered horizontally (-imgW/2)
-                // y: at rim (-radius)
                 ctx.drawImage(img, -imgW/2, -radius, imgW, imgH);
-                
             } else {
-                 // Create gradient for depth (darker at center, lighter at edge)
                 const segGradient = ctx.createRadialGradient(0, 0, 50, 0, 0, radius);
-                segGradient.addColorStop(0, adjustColorBrightness(color, -40)); // Darker center
-                segGradient.addColorStop(1, color); // Pure color at edge
+                segGradient.addColorStop(0, adjustColorBrightness(color, -40));
+                segGradient.addColorStop(1, color);
                 
                 ctx.fillStyle = segGradient;
                 ctx.fill();
@@ -162,7 +117,7 @@ const WheelCanvas = ({ items, onSpinEnd, isSpinning, spinTrigger, width = 500, h
             ctx.lineWidth = 1;
             ctx.stroke();
 
-            // 3. Draw Text (Only if no image, or for genre wheel)
+            // 3. Draw Text
             if (!img) {
                 ctx.save();
                 ctx.translate(Math.cos(segmentAngle + arc / 2) * (radius * 0.60), 
@@ -192,7 +147,7 @@ const WheelCanvas = ({ items, onSpinEnd, isSpinning, spinTrigger, width = 500, h
         ctx.restore(); // End rotation
         
 
-            if (isDonut) {
+        if (isDonut) {
             // Donut: Find current winner to show in center
             const idx = getIndexAtTop(angle, items.length);
             const centerItem = items[idx];
@@ -215,7 +170,6 @@ const WheelCanvas = ({ items, onSpinEnd, isSpinning, spinTrigger, width = 500, h
                  ctx.save();
                  ctx.clip(); 
                  
-                 // Draw image centered and covering
                  const imgRatio = cImg.height / cImg.width;
                  const drawW = innerRadius * 2;
                  const drawH = drawW * imgRatio;
@@ -254,10 +208,6 @@ const WheelCanvas = ({ items, onSpinEnd, isSpinning, spinTrigger, width = 500, h
         }
 
         // 5. Glass Overlay / Shine
-        // ... existing shine code ...
-        // Update shine radius to start outside inner hole?
-        // Or just keep it over everything (it's subtle).
-        
         const shineGradient = ctx.createLinearGradient(0, 0, size, size);
         shineGradient.addColorStop(0, 'rgba(255,255,255,0.05)');
         shineGradient.addColorStop(0.5, 'rgba(255,255,255,0)');
@@ -276,60 +226,6 @@ const WheelCanvas = ({ items, onSpinEnd, isSpinning, spinTrigger, width = 500, h
         ctx.strokeStyle = 'rgba(255,255,255,0.1)';
         ctx.lineWidth = 2;
         ctx.stroke();
-    };
-    
-    const getIndexAtTop = (currentAngle, totalItems) => {
-         const arc = (2 * Math.PI) / totalItems;
-        // Pointer is at 270deg (3PI/2)
-        // Angle + SegmentAngle = 3PI/2
-        // SegmentAngle = 3PI/2 - Angle
-        
-        let pointerAngle = (1.5 * Math.PI - currentAngle) % (2 * Math.PI);
-        if (pointerAngle < 0) pointerAngle += 2 * Math.PI;
-
-        return Math.floor(pointerAngle / arc);
-    };
-
-    // Helper to darken colors for gradient
-    const adjustColorBrightness = (col, amt) => {
-        let usePound = false;
-        if (col[0] === "#") {
-            col = col.slice(1);
-            usePound = true;
-        }
-        let num = parseInt(col, 16);
-        let r = (num >> 16) + amt;
-        if (r > 255) r = 255; else if (r < 0) r = 0;
-        let b = ((num >> 8) & 0x00FF) + amt;
-        if (b > 255) b = 255; else if (b < 0) b = 0;
-        let g = (num & 0x0000FF) + amt;
-        if (g > 255) g = 255; else if (g < 0) g = 0;
-        return (usePound ? "#" : "") + (g | (b << 8) | (r << 16)).toString(16);
-    };
-
-    const wrapText = (ctx, text, x, y, maxWidth, lineHeight) => {
-        const words = text.split(' ');
-        let line = '';
-        const lines = [];
-
-        for(let n = 0; n < words.length; n++) {
-            const testLine = line + words[n] + ' ';
-            const metrics = ctx.measureText(testLine);
-            const testWidth = metrics.width;
-            if (testWidth > maxWidth && n > 0) {
-                lines.push(line);
-                line = words[n] + ' ';
-            } else {
-                line = testLine;
-            }
-        }
-        lines.push(line);
-
-        let startY = y - ((lines.length - 1) * lineHeight) / 2;
-
-        for(let k = 0; k < lines.length; k++) {
-            ctx.fillText(lines[k], x, startY + (k * lineHeight));
-        }
     };
 
     const determineWinner = (finalAngle) => {
@@ -353,7 +249,6 @@ const WheelCanvas = ({ items, onSpinEnd, isSpinning, spinTrigger, width = 500, h
             const state = stateRef.current;
             
             if (state.isSpinning) {
-                // Higher threshold to stop sooner
                 if (state.velocity < 0.002) {
                     state.isSpinning = false;
                     state.velocity = 0;
@@ -361,7 +256,6 @@ const WheelCanvas = ({ items, onSpinEnd, isSpinning, spinTrigger, width = 500, h
                     onSpinEnd(winner);
                 } else {
                     state.angle += state.velocity;
-                    // Increased friction (lower multiplier) to slow down faster
                     state.velocity *= 0.985; 
                     state.angle %= (2 * Math.PI);
                 }
