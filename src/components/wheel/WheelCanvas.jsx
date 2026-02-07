@@ -63,7 +63,8 @@ const WheelCanvas = ({ items, onSpinEnd, isSpinning, spinTrigger, width = 500, h
         
         const ctx = offscreenCanvasRef.current.getContext('2d');
         const size = width; // Use prop width/height
-        
+        const scale = size / 1200; // Base scale on 1200px design
+
         // Update offscreen canvas size if needed (clears it too)
         if (offscreenCanvasRef.current.width !== size || offscreenCanvasRef.current.height !== size) {
              offscreenCanvasRef.current.width = size;
@@ -73,7 +74,7 @@ const WheelCanvas = ({ items, onSpinEnd, isSpinning, spinTrigger, width = 500, h
         }
 
         const center = size / 2;
-        const radius = size / 2 - 20;
+        const radius = size / 2 - (20 * scale);
         const arc = (2 * Math.PI) / items.length;
         const chord = 2 * radius * Math.sin(arc / 2);
         
@@ -83,15 +84,15 @@ const WheelCanvas = ({ items, onSpinEnd, isSpinning, spinTrigger, width = 500, h
         // 1. Draw Outer Rim / Bezel
         ctx.save();
         ctx.beginPath();
-        ctx.arc(0, 0, radius + 15, 0, 2 * Math.PI);
-        const rimGradient = ctx.createRadialGradient(0, 0, radius, 0, 0, radius + 15);
+        ctx.arc(0, 0, radius + (15 * scale), 0, 2 * Math.PI);
+        const rimGradient = ctx.createRadialGradient(0, 0, radius, 0, 0, radius + (15 * scale));
         rimGradient.addColorStop(0, '#1e1b4b');
         rimGradient.addColorStop(0.5, '#4c1d95');
         rimGradient.addColorStop(1, '#000');
         ctx.fillStyle = rimGradient;
         ctx.fill();
         ctx.strokeStyle = 'rgba(139, 92, 246, 0.5)';
-        ctx.lineWidth = 2;
+        ctx.lineWidth = 2 * scale;
         ctx.stroke();
         ctx.restore();
 
@@ -112,16 +113,16 @@ const WheelCanvas = ({ items, onSpinEnd, isSpinning, spinTrigger, width = 500, h
             ctx.save();
             if (img) {
                 ctx.clip();
-                const scale = chord / img.width;
-                const imgW = img.width * scale;
-                const imgH = img.height * scale;
+                const scaleImg = chord / img.width;
+                const imgW = img.width * scaleImg;
+                const imgH = img.height * scaleImg;
                 
                 ctx.rotate(segmentAngle + arc / 2);
                 ctx.rotate(Math.PI/2); 
                 
                 ctx.drawImage(img, -imgW/2, -radius, imgW, imgH);
             } else {
-                const segGradient = ctx.createRadialGradient(0, 0, 50, 0, 0, radius);
+                const segGradient = ctx.createRadialGradient(0, 0, 50 * scale, 0, 0, radius);
                 segGradient.addColorStop(0, adjustColorBrightness(color, -40));
                 segGradient.addColorStop(1, color);
                 
@@ -131,7 +132,7 @@ const WheelCanvas = ({ items, onSpinEnd, isSpinning, spinTrigger, width = 500, h
             
             // Segment Border
             ctx.strokeStyle = 'rgba(0,0,0,0.5)';
-            ctx.lineWidth = 1;
+            ctx.lineWidth = 1 * scale;
             ctx.stroke();
 
             // 3. Draw Text
@@ -142,19 +143,19 @@ const WheelCanvas = ({ items, onSpinEnd, isSpinning, spinTrigger, width = 500, h
                 ctx.rotate(segmentAngle + arc / 2);
                 ctx.fillStyle = '#FFFFFF';
                 // Adaptive font size
-                const calculatedFontSize = fontSize || (size > 800 ? 24 : 16);
+                const calculatedFontSize = fontSize || (24 * scale);
                 ctx.font = `bold ${calculatedFontSize}px Outfit, sans-serif`; 
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
                 
                 ctx.shadowColor = "rgba(0,0,0,0.9)";
-                ctx.shadowBlur = 4;
-                ctx.shadowOffsetX = 1;
-                ctx.shadowOffsetY = 1;
+                ctx.shadowBlur = 4 * scale;
+                ctx.shadowOffsetX = 1 * scale;
+                ctx.shadowOffsetY = 1 * scale;
                 
                 const maxWidth = radius * 0.6;
                 const label = typeof item === 'string' ? item : (item.label || item);
-                wrapText(ctx, label, 0, 0, maxWidth, calculatedFontSize + 4);
+                wrapText(ctx, label, 0, 0, maxWidth, calculatedFontSize + (4 * scale));
                 
                 ctx.restore();
             }
@@ -173,8 +174,9 @@ const WheelCanvas = ({ items, onSpinEnd, isSpinning, spinTrigger, width = 500, h
     // Main Draw Function (Animation Loop) - Draws the transformed static image
     const draw = (ctx, angle) => {
         const size = ctx.canvas.width;
+        const scale = size / 1200;
         const center = size / 2;
-        const radius = size / 2 - 20;
+        const radius = size / 2 - (20 * scale);
 
         ctx.clearRect(0, 0, size, size);
 
@@ -191,8 +193,8 @@ const WheelCanvas = ({ items, onSpinEnd, isSpinning, spinTrigger, width = 500, h
         const chord = 2 * radius * Math.sin((2 * Math.PI) / items.length / 2);
         const expectedPosterHeight = chord * 1.5;
         let calculatedInner = radius - expectedPosterHeight;
-        if (calculatedInner < 50) calculatedInner = 50;
-        const innerRadius = isDonut ? calculatedInner : (size > 800 ? 80 : 45);
+        if (calculatedInner < 50 * scale) calculatedInner = 50 * scale;
+        const innerRadius = isDonut ? calculatedInner : (80 * scale);
 
 
         if (isDonut) {
@@ -209,7 +211,7 @@ const WheelCanvas = ({ items, onSpinEnd, isSpinning, spinTrigger, width = 500, h
             ctx.fillStyle = '#050511'; 
             ctx.fill();
             ctx.strokeStyle = 'rgba(139, 92, 246, 0.5)';
-            ctx.lineWidth = 4;
+            ctx.lineWidth = 4 * scale;
             ctx.stroke();
             
             // Draw Center Poster
@@ -235,11 +237,11 @@ const WheelCanvas = ({ items, onSpinEnd, isSpinning, spinTrigger, width = 500, h
             } else if (centerItem) {
                  // Fallback text
                 ctx.fillStyle = '#FFF';
-                ctx.font = `bold ${size > 800 ? 40 : 20}px Outfit, sans-serif`;
+                ctx.font = `bold ${40 * scale}px Outfit, sans-serif`;
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
                 const label = (typeof centerItem === 'string') ? centerItem : (centerItem.label || centerItem);
-                wrapText(ctx, label, 0, 0, innerRadius * 1.5, (size > 800 ? 40 : 20) + 5);
+                wrapText(ctx, label, 0, 0, innerRadius * 1.5, (40 * scale) + (5 * scale));
             }
             
             ctx.restore();
@@ -248,7 +250,7 @@ const WheelCanvas = ({ items, onSpinEnd, isSpinning, spinTrigger, width = 500, h
             ctx.save();
             ctx.translate(center, center);
             ctx.beginPath();
-            const innerRingSize = size > 800 ? 80 : 45;
+            const innerRingSize = 80 * scale;
             ctx.arc(0, 0, innerRingSize, 0, 2 * Math.PI);
             ctx.fillStyle = 'rgba(0,0,0,0.3)';
             ctx.fill();
@@ -270,9 +272,9 @@ const WheelCanvas = ({ items, onSpinEnd, isSpinning, spinTrigger, width = 500, h
         
         // Circular highlight ring (Outer)
         ctx.beginPath();
-        ctx.arc(center, center, radius - 2, 0, 2 * Math.PI);
+        ctx.arc(center, center, radius - 2 * scale, 0, 2 * Math.PI);
         ctx.strokeStyle = 'rgba(255,255,255,0.1)';
-        ctx.lineWidth = 2;
+        ctx.lineWidth = 2 * scale;
         ctx.stroke();
     };
 

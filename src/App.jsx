@@ -258,9 +258,9 @@ function AppContent() {
                             items={currentWheelItems} 
                             onSpinEnd={isGenrePhase ? onGenreSpinEnd : onMovieSpinEnd}
                             spinTrigger={spinTrigger}
-                            width={1200}
-                            height={1200}
-                            fontSize={isGenrePhase ? 80 : 24}
+                            width={3600}
+                            height={3600}
+                            fontSize={isGenrePhase ? 240 : 72}
                             colors={isGenrePhase ? GENRE_COLORS : undefined}
                             isDonut={!isGenrePhase}
                         />
