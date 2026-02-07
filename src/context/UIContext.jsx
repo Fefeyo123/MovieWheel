@@ -17,6 +17,18 @@ export const UIProvider = ({ children }) => {
     // Modals State
     const [showAddModal, setShowAddModal] = useState(false);
     const [showListModal, setShowListModal] = useState(false);
+    
+    // Confirmation/Alert Modal State
+    const [confirmationModal, setConfirmationModal] = useState({
+        isOpen: false,
+        type: 'confirm',
+        message: '',
+        title: '',
+        confirmText: 'Yes',
+        cancelText: 'Cancel',
+        onConfirm: null,
+        onCancel: null
+    });
 
     // Persist user selection
     useEffect(() => {
@@ -24,6 +36,45 @@ export const UIProvider = ({ children }) => {
             localStorage.setItem('movieUser', selectedUser);
         }
     }, [selectedUser]);
+
+    const confirm = (message, options = {}) => {
+        return new Promise((resolve) => {
+            setConfirmationModal({
+                isOpen: true,
+                message,
+                type: 'confirm',
+                title: options.title || 'Wait a sec...',
+                confirmText: options.confirmText || 'Yes',
+                cancelText: options.cancelText || 'Cancel',
+                onConfirm: () => {
+                    setConfirmationModal(prev => ({ ...prev, isOpen: false }));
+                    resolve(true);
+                },
+                onCancel: () => {
+                    setConfirmationModal(prev => ({ ...prev, isOpen: false }));
+                    resolve(false);
+                }
+            });
+        });
+    };
+
+    const alert = (message, options = {}) => {
+        return new Promise((resolve) => {
+            setConfirmationModal({
+                isOpen: true,
+                message,
+                type: options.type || 'error',
+                title: options.title || 'Oops!',
+                confirmText: options.confirmText || 'Got it',
+                cancelText: null, // No cancel button for alerts
+                onConfirm: () => {
+                    setConfirmationModal(prev => ({ ...prev, isOpen: false }));
+                    resolve(true);
+                },
+                onCancel: null
+            });
+        });
+    };
 
     const value = {
         selectedUser,
@@ -36,6 +87,9 @@ export const UIProvider = ({ children }) => {
         closeAddModal: () => setShowAddModal(false),
         openListModal: () => setShowListModal(true),
         closeListModal: () => setShowListModal(false),
+        confirmationModal,
+        confirm,
+        alert
     };
 
     return (

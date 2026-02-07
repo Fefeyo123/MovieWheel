@@ -230,22 +230,12 @@ const AddMovieModal = ({ onClose, currentUser }) => {
     };
 
     return (
-        <ModalWrapper 
-            onClose={onClose}
-            className="w-full max-w-[800px] max-h-[85vh] flex flex-col p-4 sm:p-8"
-        >
-            {warning && (
-                <WarningModal 
-                    type={warning.type} 
-                    message={warning.message} 
-                    onConfirm={warning.onConfirm} 
-                    onCancel={warning.onCancel}
-                    confirmText={warning.confirmText}
-                    cancelText={warning.cancelText}
-                />
-            )}
-            
-            <div className="flex justify-between items-center mb-4 sm:mb-6">
+        <>
+            <ModalWrapper 
+                onClose={onClose}
+                className="w-full max-w-[800px] max-h-[85vh] flex flex-col p-4 sm:p-8"
+            >
+                <div className="flex justify-between items-center mb-4 sm:mb-6">
                     <h2 className="m-0 text-xl sm:text-2xl font-bold bg-gradient-to-r from-white to-text-muted bg-clip-text text-transparent">Add Movie</h2>
                     <button onClick={onClose} className="bg-transparent border-none text-2xl text-text-muted cursor-pointer transition-all duration-300 p-2 rounded-full hover:text-white hover:bg-white/10 hover:rotate-90">&times;</button>
                 </div>
@@ -288,7 +278,7 @@ const AddMovieModal = ({ onClose, currentUser }) => {
                             }
                             actions={
                                 <motion.button 
-                                    onClick={() => handleAdd(movie)}
+                                    onClick={(e) => { e.stopPropagation(); handleAdd(movie); }}
                                     whileHover={{ scale: 1.1, backgroundColor: "rgba(139, 92, 246, 1)", color: "#fff", boxShadow: "0 0 15px rgba(139, 92, 246, 0.6)" }}
                                     whileTap={{ scale: 0.9 }}
                                     className="w-[36px] h-[36px] rounded-full border border-neon-secondary/30 bg-neon-secondary/10 text-neon-secondary text-xl font-light cursor-pointer flex items-center justify-center shrink-0 transition-colors duration-300"
@@ -311,7 +301,19 @@ const AddMovieModal = ({ onClose, currentUser }) => {
                         </div>
                     )}
                 </div>
-        </ModalWrapper>
+            </ModalWrapper>
+
+            {warning && (
+                <WarningModal 
+                    type={warning.type} 
+                    message={warning.message} 
+                    onConfirm={warning.onConfirm} 
+                    onCancel={warning.onCancel}
+                    confirmText={warning.confirmText}
+                    cancelText={warning.cancelText}
+                />
+            )}
+        </>
     );
 };
 

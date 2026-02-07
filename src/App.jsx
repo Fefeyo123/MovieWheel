@@ -8,10 +8,11 @@ import { supabase } from './utils/supabaseClient';
 import { THE_BOIS, GENRE_COLORS } from './utils/constants';
 import { parseGenre } from './utils/helpers';
 import useWheelData from './hooks/useWheelData';
-import { UIProvider } from './context/UIContext';
+import { UIProvider, useUI } from './context/UIContext';
 import './index.css';
 
 function AppContent() {
+    const { confirm, alert } = useUI();
     const [phase, setPhase] = useState('genre'); // genre | movies | result
     const [selectedGenre, setSelectedGenre] = useState(null);
     const [selectedMovie, setSelectedMovie] = useState(null);
@@ -193,7 +194,11 @@ function AppContent() {
     };
 
     const handleRemoveMovie = async (movie) => {
-        if (!window.confirm(`Remove "${movie.title}" from the queue?`)) return;
+        if (!await confirm(`Remove "${movie.title}" from the queue?`, {
+            title: 'Remove Movie',
+            confirmText: 'Delete',
+            type: 'error' // Makes the button red
+        })) return;
 
         // Optimistic Update
         const previousMovies = [...movies];

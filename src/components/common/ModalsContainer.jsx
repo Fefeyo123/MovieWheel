@@ -2,6 +2,7 @@ import React from 'react';
 import { useUI } from '../../context/UIContext';
 import AddMovieModal from '../modals/AddMovieModal';
 import MovieListModal from '../modals/MovieListModal';
+import WarningModal from '../modals/WarningModal';
 
 const ModalsContainer = ({ movies, onDelete, onToggleWatched }) => {
     const { 
@@ -9,7 +10,8 @@ const ModalsContainer = ({ movies, onDelete, onToggleWatched }) => {
         closeAddModal, 
         showListModal, 
         closeListModal,
-        selectedUser 
+        selectedUser,
+        confirmationModal
     } = useUI();
 
     return (
@@ -27,6 +29,18 @@ const ModalsContainer = ({ movies, onDelete, onToggleWatched }) => {
                     onClose={closeListModal} 
                     onDelete={onDelete}
                     onToggleWatched={onToggleWatched}
+                />
+            )}
+
+            {confirmationModal.isOpen && (
+                <WarningModal
+                    type={confirmationModal.type}
+                    message={confirmationModal.message}
+                    title={confirmationModal.title}
+                    confirmText={confirmationModal.confirmText}
+                    cancelText={confirmationModal.cancelText}
+                    onConfirm={confirmationModal.onConfirm}
+                    onCancel={confirmationModal.onCancel}
                 />
             )}
         </>
