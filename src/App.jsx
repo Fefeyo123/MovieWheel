@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import WheelCanvas from './components/WheelCanvas';
 import AddMovieModal from './components/AddMovieModal';
 import MovieListModal from './components/MovieListModal';
@@ -6,6 +7,19 @@ import { supabase } from './utils/supabaseClient';
 import './index.css';
 
 const THE_BOIS = ["Foo", "Lex", "Yan", "Jer", "Brt", "Gustav"];
+
+const GENRE_COLORS = [
+    '#EF4444', // Red
+    '#F97316', // Orange
+    '#F59E0B', // Amber
+    '#84CC16', // Lime
+    '#10B981', // Emerald
+    '#06B6D4', // Cyan
+    '#3B82F6', // Blue
+    '#8B5CF6', // Violet
+    '#D946EF', // Fuchsia
+    '#F43F5E', // Rose
+];
 
 const parseGenre = (genreData) => {
     if (!genreData) return [];
@@ -29,6 +43,7 @@ function App() {
     const [selectedGenre, setSelectedGenre] = useState(null);
     const [selectedMovie, setSelectedMovie] = useState(null);
     const [spinTrigger, setSpinTrigger] = useState(0);
+    const [wheelOpacity, setWheelOpacity] = useState(1);
     const [showAddModal, setShowAddModal] = useState(false);
     const [showListModal, setShowListModal] = useState(false);
     
@@ -106,20 +121,19 @@ function App() {
         setSpinTrigger(prev => prev + 1);
     };
 
-    const onGenreSpinEnd = (genre) => {
+    const onGenreSpinEnd = React.useCallback((genre) => {
         setSelectedGenre(genre);
-        setTimeout(() => {
-            setPhase('movies');
-            setSpinTrigger(0); // Reset trigger so it doesn't auto-spin next wheel
-        }, 1500);
-    };
-
-    const onMovieSpinEnd = (movieObj) => {
-        const resultText = movieObj.title; // The wheel returns an object { title: "Text" } or just text depending on impl, but here we passed { title: item } so it has .title
         
         setTimeout(() => {
-            // Check if it's a collection first
-            // We need to reconstruct the groups to find it, or search the flat list
+            setPhase('movies');
+            setSpinTrigger(0); 
+        }, 800);
+    }, []);
+
+    const onMovieSpinEnd = React.useCallback((item) => {
+        const resultText = item.value || item; 
+        
+        setTimeout(() => {
             // Optimization: Find if any movie has this collection_name
             const collectionMatch = movies.filter(m => {
                  const isGenreMatch = m.genre.includes(selectedGenre);
@@ -128,13 +142,11 @@ function App() {
             
             if (collectionMatch.length > 0) {
                 // It is a collection!
-                // Sort by release_date
                 const sorted = [...collectionMatch].sort((a, b) => {
                     if (!a.release_date) return -1;
                     if (!b.release_date) return 1;
                     return new Date(a.release_date) - new Date(b.release_date);
                 });
-                // Pick first one (next in queue)
                 setSelectedMovie(sorted[0]);
             } else {
                 // Standalone movie
@@ -143,13 +155,20 @@ function App() {
             }
             setPhase('result');
         }, 1000);
-    };
+    }, [movies, selectedGenre]);
 
     const reset = () => {
-        setPhase('genre');
-        setSelectedGenre(null);
-        setSelectedMovie(null);
-        setSpinTrigger(0); // Reset trigger to prevent auto-spin
+        // Reverse sequence for reset
+        // setWheelOpacity(0); // Allow visible transition back
+        // setTimeout(() => {
+            setPhase('genre');
+            setSelectedGenre(null);
+            setSelectedMovie(null);
+            setSpinTrigger(0); 
+            // setTimeout(() => {
+            //     setWheelOpacity(1);
+            // }, 300);
+        // }, 300);
     };
 
     const markAsWatched = async () => {
@@ -191,131 +210,218 @@ function App() {
     const genreItems = availableGenres;
     
     // Grouping Logic for Wheel
-    // 1. Filter by Genre
-    const moviesInGenre = movies.filter(m => m.genre.includes(selectedGenre));
+    const { moviesInGenre, wheelItemsSet } = React.useMemo(() => {
+        // 1. Filter by Genre
+        const filtered = movies.filter(m => m.genre.includes(selectedGenre));
 
-    // 2. Group by Collection
-    const wheelItemsSet = new Set();
-    moviesInGenre.forEach(m => {
-        if (m.collection_name) {
-            // If part of a collection, add the collection name
-            wheelItemsSet.add(m.collection_name);
+        // 2. Group by Collection
+        const itemsSet = new Set();
+        
+        // First, group movies by collection
+        const collectionGroups = {};
+        filtered.forEach(m => {
+            if (m.collection_name) {
+                if (!collectionGroups[m.collection_name]) {
+                    collectionGroups[m.collection_name] = [];
+                }
+                collectionGroups[m.collection_name].push(m);
+            }
+        });
+
+        filtered.forEach(m => {
+            if (m.collection_name && collectionGroups[m.collection_name].length > 1) {
+                itemsSet.add(m.collection_name);
+            } else {
+                itemsSet.add(m.title);
+            }
+        });
+        
+        return { moviesInGenre: filtered, wheelItemsSet: itemsSet };
+    }, [movies, selectedGenre]);
+
+    const effectiveMovieItems = React.useMemo(() => {
+        const items = [];
+        if (wheelItemsSet.size > 0) {
+            wheelItemsSet.forEach(itemTitle => {
+                const match = moviesInGenre.find(m => m.collection_name === itemTitle || m.title === itemTitle);
+                
+                if (match) {
+                    items.push({
+                        type: 'movie_or_collection',
+                        label: itemTitle, 
+                        posterPath: match.poster_path,
+                        value: itemTitle 
+                    });
+                }
+            });
         } else {
-            // If standalone, add the title
-            wheelItemsSet.add(m.title);
+            items.push({ type: 'text', label: "No Movies", value: "No Movies" });
+            items.push({ type: 'text', label: "Add Some!", value: "Add Some!" });
         }
-    });
+        return items;
+    }, [wheelItemsSet, moviesInGenre]);
+    
+    // Determine which items to show based on phase
+    // If phase is 'genre', show genreItems (strings)
+    // If phase is 'movies' or 'result', show effectiveMovieItems (objects)
+    const currentWheelItems = phase === 'genre' ? (genreItems.length > 0 ? genreItems : ['Add Movies']) : effectiveMovieItems;
 
-    const effectiveMovieItems = wheelItemsSet.size > 0 ? Array.from(wheelItemsSet) : ["No Movies", "Add Some!"];
+    // Transition Logic
+    const isGenrePhase = phase === 'genre';
+    const isResultPhase = phase === 'result';
 
     return (
-        <div className="app-container">
-            <header className="mb-12 w-full">
-                <div className="flex flex-col sm:flex-row justify-center items-center gap-4 mb-8 w-full">
-                    <div className="relative">
+        <div className="app-container relative h-full min-h-screen overflow-hidden">
+            <header className="mb-4 sm:mb-8 w-full z-50 relative px-4">
+                <div className="flex flex-col sm:flex-row justify-center items-center gap-4 mb-6 sm:mb-6 w-full animate-[fadeIn_0.5s_ease-out]">
+                    <motion.div 
+                        className="relative group w-full sm:w-auto"
+                        whileHover={{ scale: 1.02 }}
+                        transition={{ type: "spring", stiffness: 400, damping: 10 }}
+                    >
                         <select 
                             value={selectedUser} 
                             onChange={handleUserChange}
-                            className="appearance-none pl-6 pr-10 py-2.5 bg-slate-900/50 text-neon-secondary border border-neon-secondary/30 rounded-full text-sm font-semibold uppercase tracking-wider backdrop-blur-md transition-all duration-300 cursor-pointer outline-none hover:bg-neon-secondary/10 hover:border-neon-secondary hover:shadow-[0_0_15px_rgba(139,92,246,0.3)] focus:bg-neon-secondary/10 focus:border-neon-secondary"
+                            className="appearance-none w-full sm:w-auto pl-6 pr-12 py-3 bg-white/5 text-neon-secondary border border-neon-secondary/30 rounded-full text-sm font-bold uppercase tracking-wider backdrop-blur-md transition-all duration-300 cursor-pointer outline-none hover:bg-neon-secondary/10 hover:border-neon-secondary hover:shadow-[0_0_20px_rgba(139,92,246,0.2)] focus:bg-neon-secondary/10 focus:border-neon-secondary"
                         >
                             <option value="">Who are you?</option>
                             {THE_BOIS.map(boi => <option key={boi} value={boi}>{boi}</option>)}
                         </select>
-                        <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-neon-secondary">
+                        <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-neon-secondary transition-transform duration-300 group-hover:translate-x-1">
                           <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/></svg>
                         </div>
-                    </div>
+                    </motion.div>
                     
-                    <div className="flex gap-3">
-                        <button className="secondary-btn flex items-center gap-2" onClick={() => setShowAddModal(true)}>
-                            <span>+</span> Add Movie
-                        </button>
-                        <button className="secondary-btn" onClick={() => setShowListModal(true)}>
+                    <div className="flex gap-4 w-full sm:w-auto justify-center">
+                        <motion.button 
+                            className="secondary-btn flex-1 sm:flex-none flex items-center justify-center gap-2 group" 
+                            onClick={() => setShowAddModal(true)}
+                            whileHover={{ scale: 1.05 }}
+                            whileTap={{ scale: 0.95 }}
+                            transition={{ type: "spring", stiffness: 400, damping: 10 }}
+                        >
+                            <span className="text-lg leading-none group-hover:scale-125 transition-transform duration-300">+</span> Add Movie
+                        </motion.button>
+                        <motion.button 
+                            className="secondary-btn flex-1 sm:flex-none flex items-center justify-center gap-2" 
+                            onClick={() => setShowListModal(true)}
+                            whileHover={{ scale: 1.05 }}
+                            whileTap={{ scale: 0.95 }}
+                            transition={{ type: "spring", stiffness: 400, damping: 10 }}
+                        >
+                            <span className="material-symbols-outlined text-[18px]">list</span>
                             Queue ({movies.length})
-                        </button>
+                        </motion.button>
                     </div>
                 </div>
                 
-                <h1 className="text-6xl font-extrabold bg-gradient-to-br from-[#e879f9] via-neon-secondary to-[#22d3ee] bg-clip-text text-transparent mb-2 tracking-tighter drop-shadow-[0_0_15px_rgba(139,92,246,0.4)]">
+                <h1 className="text-4xl sm:text-6xl font-extrabold bg-gradient-to-br from-[#e879f9] via-neon-secondary to-[#22d3ee] bg-clip-text text-transparent mb-2 tracking-tighter drop-shadow-[0_0_15px_rgba(139,92,246,0.4)]">
                     NextUp
                 </h1>
-                <p className="text-text-muted text-lg font-light tracking-wide">
+                <p className="text-text-muted text-base sm:text-lg font-light tracking-wide">
                     Spin to decide your movie night.
                 </p>
+                
+                {/* Header Text Transition */}
+                <div className={`transition-all duration-500 mt-4 sm:mt-8 ${!isGenrePhase ? 'opacity-0 translate-y-[-20px] pointer-events-none absolute w-full' : 'opacity-100 translate-y-0 relative'}`}>
+                     <h2 className="font-normal text-2xl sm:text-3xl text-text-main">
+                        {availableGenres.length > 0 ? "Pick a Genre" : "Add movies to start!"}
+                    </h2>
+                </div>
+
+                <div className={`transition-all duration-500 mt-2 ${isGenrePhase ? 'opacity-0 translate-y-[20px] pointer-events-none absolute w-full' : 'opacity-100 translate-y-0 relative'}`}>
+                      <h2 className="font-normal text-3xl sm:text-4xl text-text-main">
+                        <span className="text-neon-primary font-bold drop-shadow-[0_0_10px_rgba(217,70,239,0.6)]">{selectedGenre}</span> Movies
+                     </h2>
+                </div>
             </header>
 
-            <main className="w-full">
-                {phase === 'genre' && (
-                    <section className="animate-fadeScaleIn w-full flex flex-col items-center">
-                        <h2 className="mb-8 font-normal text-3xl text-text-main">
-                            {availableGenres.length > 0 ? "Pick a Genre" : "Add movies to start!"}
-                        </h2>
-                        
-                        {availableGenres.length > 0 ? (
-                            <div className="relative w-[400px] h-[400px] mx-auto mb-12 flex justify-center items-center drop-shadow-[0_0_30px_rgba(139,92,246,0.15)]">
-                                <div className="pointer absolute -top-[25px] left-1/2 -translate-x-1/2 w-[40px] h-[50px] z-10 drop-shadow-md before:content-[''] before:absolute before:top-0 before:left-1/2 before:-translate-x-1/2 before:w-[4px] before:h-full before:bg-gradient-to-b before:from-neon-accent before:to-white before:rounded-sm before:shadow-[0_0_10px_var(--neon-accent)] after:content-[''] after:absolute after:top-0 after:left-1/2 after:-translate-x-1/2 after:rotate-45 after:w-[20px] after:h-[20px] after:bg-bg-dark after:border-2 after:border-neon-accent after:rounded-md after:shadow-[0_0_10px_var(--neon-accent)]"></div>
-                                <WheelCanvas 
-                                    items={genreItems} 
-                                    onSpinEnd={onGenreSpinEnd}
-                                    spinTrigger={spinTrigger}
-                                />
-                                <button 
-                                    onClick={handleSpin} 
-                                    className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[90px] h-[90px] rounded-full bg-[radial-gradient(circle_at_30%_30%,#4c1d95,#000)] border-2 border-white/20 text-white font-extrabold text-xl tracking-widest cursor-pointer shadow-[0_0_0_4px_rgba(0,0,0,0.8),0_0_20px_rgba(139,92,246,0.5),inset_0_2px_10px_rgba(255,255,255,0.2)] z-20 flex items-center justify-center transition-all duration-300 hover:-translate-x-1/2 hover:-translate-y-1/2 hover:scale-105 hover:bg-[radial-gradient(circle_at_30%_30%,#6d28d9,#000)] hover:shadow-[0_0_0_4px_rgba(0,0,0,0.8),0_0_40px_var(--neon-primary),inset_0_2px_20px_rgba(255,255,255,0.4)] active:scale-95 active:shadow-[0_0_10px_var(--neon-primary)] after:content-[''] after:absolute after:-inset-[5px] after:rounded-full after:border-2 after:border-neon-primary after:opacity-0 after:animate-[pulse-ring_2s_infinite]"
-                                >
-                                    SPIN
-                                </button>
-                            </div>
-                        ) : (
-                            <div className="text-text-muted my-12 text-center text-base leading-relaxed">
-                                <p>No genres available yet.</p>
-                                <p>Click "+ Add Movie" to populate the wheel.</p>
-                            </div>
-                        )}
-                    </section>
-                )}
-
-                {phase === 'movies' && (
-                    <section className="fixed inset-0 w-full h-full pointer-events-none flex flex-col items-center justify-end z-0">
-                         {/* Header for this phase - positioned absolutely at top or just floating */}
-                         <div className="absolute top-[15%] w-full text-center pointer-events-auto z-10 animate-fadeScaleIn">
-                             <h2 className="font-normal text-4xl text-text-main">
-                                <span className="text-neon-primary font-bold drop-shadow-[0_0_10px_rgba(217,70,239,0.6)]">{selectedGenre}</span> Movies
-                             </h2>
-                             <p className="text-text-muted mt-2">Spin for your destiny</p>
-                         </div>
-
-                        {/* GIANT WHEEL CONTAINER */}
-                        {/* 
-                            We want a huge wheel that slides up from the bottom.
-                            Let's make it 85vw width (max 1000px) but square aspect ratio 
-                            Actually, let's fix pixels for consistent "giantness" regardless of screen.
-                            1500px is good.
-                            Position: center of wheel = slightly below bottom of screen?
-                            User said "exposing only the top half". So center should be AT the bottom edge.
-                        */}
-                        <div className="animate-slideUpFixed relative pointer-events-auto mb-[-600px]"> 
-                             {/* Spin Button floating above the wheel */}
-                            <button 
-                                onClick={handleSpin} 
-                                className="absolute -top-[120px] left-1/2 -translate-x-1/2 w-[110px] h-[110px] rounded-full bg-[radial-gradient(circle_at_30%_30%,#4c1d95,#000)] border-4 border-white/20 text-white font-extrabold text-2xl tracking-widest cursor-pointer shadow-[0_0_0_6px_rgba(0,0,0,0.8),0_0_30px_rgba(139,92,246,0.6),inset_0_2px_15px_rgba(255,255,255,0.2)] z-30 flex items-center justify-center transition-all duration-300 hover:-translate-x-1/2 hover:scale-110 hover:bg-[radial-gradient(circle_at_30%_30%,#6d28d9,#000)] hover:shadow-[0_0_0_6px_rgba(0,0,0,0.8),0_0_50px_var(--neon-primary),inset_0_2px_25px_rgba(255,255,255,0.4)] active:scale-95 active:shadow-[0_0_20px_var(--neon-primary)]"
-                            >
-                                SPIN
-                            </button>
-
-                             {/* Pointer */}
-                             <div className="pointer-events-none absolute -top-[25px] left-1/2 -translate-x-1/2 w-[60px] h-[70px] z-20 drop-shadow-xl before:content-[''] before:absolute before:top-0 before:left-1/2 before:-translate-x-1/2 before:w-[6px] before:h-full before:bg-gradient-to-b before:from-neon-accent before:to-white before:rounded-sm before:shadow-[0_0_15px_var(--neon-accent)] after:content-[''] after:absolute after:top-0 after:left-1/2 after:-translate-x-1/2 after:rotate-45 after:w-[30px] after:h-[30px] after:bg-bg-dark after:border-2 after:border-neon-accent after:rounded-md after:shadow-[0_0_15px_var(--neon-accent)]"></div>
-
-                            <WheelCanvas 
-                                items={effectiveMovieItems} 
-                                onSpinEnd={(item) => onMovieSpinEnd({ title: item })}
-                                spinTrigger={spinTrigger}
-                                width={1200}
-                                height={1200}
-                            />
+            <main className="w-full flex-grow relative">
+                {/* UNIFIED WHEEL CONTAINER */}
+                <motion.div 
+                    layout
+                    transition={{ type: "spring", stiffness: 40, damping: 15 }}
+                    className={`fixed z-20
+                        /* Position & Core Transform */
+                        left-1/2 -translate-x-1/2 
+                        ${isGenrePhase 
+                            ? 'top-[55%] sm:top-[60%] -translate-y-1/2 w-[90vw] h-[90vw] max-w-[400px] max-h-[400px]'  // Genre: Responsive center
+                            : 'top-[100%] sm:top-[100%] -translate-y-[50%] w-[220vw] h-[220vw] max-w-[800px] max-h-[800px] sm:w-[1000px] sm:h-[1000px] sm:max-w-none sm:max-h-none' // Movies: Large partial wheel
+                        }
+                    `}
+                >
+                     {/* Static decorations that scale with container */}
+                    <div className={`absolute -top-[25px] left-1/2 -translate-x-1/2 z-10 drop-shadow-md pointer-events-none transition-all duration-1000
+                         ${isGenrePhase 
+                            ? 'w-[40px] h-[50px]' 
+                            : 'w-[40px] h-[50px] -top-[25px]'
+                         }
+                    `}>
+                        {/* Pointer Graphic */}
+                        <div className="w-full h-full relative">
+                            <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[10%] h-full bg-gradient-to-b from-neon-accent to-white rounded-sm shadow-[0_0_10px_var(--neon-accent)]"></div>
+                             <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[50%] aspect-square bg-bg-dark border-2 border-neon-accent rounded-md rotate-45 shadow-[0_0_10px_var(--neon-accent)]"></div>
                         </div>
-                    </section>
-                )}
+                    </div>
+
+                    <div className="w-full h-full transition-opacity duration-300 ease-in-out" style={{ opacity: wheelOpacity }}>
+                        <WheelCanvas 
+                            items={currentWheelItems} 
+                            onSpinEnd={isGenrePhase ? onGenreSpinEnd : onMovieSpinEnd}
+                            spinTrigger={spinTrigger}
+                            // Use consistent high res for sharpness during scale, referencing the container's max or current size logic via CSS mostly, but canvas needs explicit internal resolution.
+                            // We keep 1200 for high DPI look.
+                            width={1200}
+                            height={1200}
+                            fontSize={isGenrePhase ? 80 : 24} // Increased genre text size, keep movie text standard
+                            colors={isGenrePhase ? GENRE_COLORS : undefined} // Custom colors for genre wheel
+                            isDonut={!isGenrePhase}
+                        />
+                    </div>
+
+                    {/* SPIN BUTTON */}
+                    <motion.button 
+                        onClick={handleSpin}
+                        whileHover={{ scale: 1.1 }}
+                        whileTap={{ scale: 0.9 }} 
+                        className={`absolute left-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full cursor-pointer z-30 flex items-center justify-center transition-all duration-1000 ease-[cubic-bezier(0.2,0.8,0.2,1)] group
+                            /* Dynamic Styles based on Phase */
+                            ${isGenrePhase 
+                                ? 'top-1/2 w-[90px] h-[90px] sm:w-[110px] sm:h-[110px]'
+                                : 'top-[-90px] w-[80px] h-[80px]'
+                            }
+                        `}
+                    >
+                        {/* Outer Glow Ring */}
+                        <div className={`absolute inset-0 rounded-full transition-all duration-500
+                            bg-gradient-to-br from-neon-primary/80 to-neon-secondary/80
+                            shadow-[0_0_30px_rgba(217,70,239,0.4),inset_0_0_20px_rgba(255,255,255,0.2)]
+                            group-hover:shadow-[0_0_50px_rgba(217,70,239,0.7),inset_0_0_30px_rgba(255,255,255,0.4)]
+                            border border-white/20 backdrop-blur-sm
+                        `}></div>
+
+                        {/* Inner Dark Circle */}
+                        <div className="absolute inset-[6px] rounded-full bg-[#0a0a0c] shadow-[inset_0_4px_10px_rgba(0,0,0,0.8)] flex items-center justify-center overflow-hidden">
+                             {/* Glossy overlay */}
+                             <div className="absolute top-0 left-0 w-full h-1/2 bg-gradient-to-b from-white/10 to-transparent pointer-events-none"></div>
+                             
+                             <span className={`font-black text-white tracking-widest transition-all duration-300 group-hover:text-neon-primary group-hover:scale-110
+                                ${isGenrePhase ? 'text-xl sm:text-2xl' : 'text-lg'}
+                             `}>
+                                SPIN
+                             </span>
+                        </div>
+                    </motion.button>
+                    
+                    {/* Shadow/Glow behind wheel for depth */}
+                    <div 
+                         className={`absolute inset-0 rounded-full transition-shadow duration-1000 -z-10
+                         ${isGenrePhase 
+                            ? 'shadow-[0_0_40px_rgba(139,92,246,0.2)]' 
+                            : 'shadow-[0_0_100px_rgba(139,92,246,0.2)]'
+                         }
+                    `}></div>
+                </motion.div>
 
                 {phase === 'result' && (
                     <div className="fixed inset-0 w-screen h-screen bg-[#050511]/70 backdrop-blur-md flex items-center justify-center z-[100] animate-[fadeIn_0.3s_ease]">

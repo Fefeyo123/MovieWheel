@@ -20,34 +20,34 @@ const WarningModal = ({ type, message, onConfirm, onCancel, confirmText, cancelT
     }
 
     return (
-        <div className="fixed inset-0 w-screen h-screen bg-[#050511]/70 backdrop-blur-md flex items-center justify-center z-[200] animate-[fadeIn_0.3s_ease]">
-            <div className="max-w-[400px] w-[90%] p-10 border border-white/10 bg-slate-900/90 backdrop-blur-2xl rounded-3xl text-center shadow-glass animate-popIn">
+        <div className="fixed inset-0 w-screen h-screen bg-[#050511]/80 backdrop-blur-xl flex items-center justify-center z-[200] animate-[fadeIn_0.3s_ease]">
+            <div className="glass-panel max-w-[400px] w-[90%] p-10 text-center animate-popIn">
                 <div 
-                    className="w-[80px] h-[80px] rounded-full bg-white/5 flex items-center justify-center mx-auto mb-6 border border-current shadow-[0_0_30px_-10px_currentColor]"
+                    className="w-[80px] h-[80px] rounded-full bg-white/5 flex items-center justify-center mx-auto mb-6 border border-current shadow-[0_0_40px_-10px_currentColor]"
                     style={{ color: iconColor }}
                 >
-                    <span className="material-symbols-outlined text-5xl">
+                    <span className="material-symbols-outlined text-5xl drop-shadow-[0_0_10px_rgba(0,0,0,0.5)]">
                         {iconName}
                     </span>
                 </div>
                 
-                <h2 className="mb-4 text-2xl font-semibold text-white">{title}</h2>
-                <p className="text-text-muted mb-8 text-lg leading-relaxed">
+                <h2 className="mb-4 text-3xl font-bold text-white tracking-wide">{title}</h2>
+                <p className="text-text-muted mb-8 text-lg leading-relaxed font-light">
                     {message}
                 </p>
 
                 <div className="flex gap-4 justify-center mt-4">
                     {onCancel && (
-                        <button onClick={onCancel} className="bg-transparent border border-text-muted text-text-muted px-6 py-2.5 rounded-full text-sm font-semibold uppercase hover:bg-white/5 hover:text-white transition-all duration-300">
+                        <button onClick={onCancel} className="bg-transparent border border-white/10 text-text-muted px-8 py-3 rounded-full text-sm font-bold uppercase tracking-wider hover:bg-white/10 hover:text-white hover:border-white/30 transition-all duration-300">
                             {cancelText || 'Cancel'}
                         </button>
                     )}
                     <button 
                         onClick={onConfirm} 
-                        className="px-6 py-2.5 rounded-full text-sm font-semibold uppercase text-white border-none cursor-pointer transition-all duration-300 hover:scale-105 hover:shadow-lg"
+                        className="px-8 py-3 rounded-full text-sm font-bold uppercase text-white border-none cursor-pointer transition-all duration-300 hover:scale-105 hover:shadow-lg hover:-translate-y-0.5"
                         style={{ 
                             background: iconColor, 
-                            boxShadow: `0 0 15px ${iconColor}66`
+                            boxShadow: `0 0 20px ${iconColor}66`
                         }}
                     >
                         {confirmText || (type === 'confirm' ? 'Yes' : 'Got it')}

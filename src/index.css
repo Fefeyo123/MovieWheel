@@ -31,15 +31,19 @@
 
 @layer components {
   .app-container {
-    @apply w-full max-w-[650px] py-12 px-6 text-center flex flex-col items-center relative z-10;
+    @apply w-full max-w-[650px] py-6 px-4 sm:py-12 sm:px-6 text-center flex flex-col items-center relative z-10 mx-auto;
   }
 
   .secondary-btn {
-    @apply bg-[rgba(139,92,246,0.1)] border border-neon-secondary text-neon-secondary px-5 py-2.5 rounded-full text-sm cursor-pointer font-semibold uppercase tracking-wider transition-all duration-300 hover:bg-neon-secondary hover:text-white hover:shadow-[0_0_20px_rgba(139,92,246,0.5)] hover:-translate-y-0.5;
+    @apply bg-white/5 border border-white/10 text-white/90 px-6 py-3 rounded-xl text-sm font-bold uppercase tracking-wider backdrop-blur-md transition-all duration-300 hover:bg-white/10 hover:border-white/30 hover:text-white hover:shadow-[0_0_20px_rgba(255,255,255,0.1)] hover:-translate-y-0.5 active:scale-95;
   }
   
-  .input-base {
-    @apply bg-transparent border-0 border-b-2 border-glass-border text-white text-lg px-1 py-2.5 rounded-none transition-colors duration-300 focus:outline-none focus:border-neon-accent;
+  .glass-panel {
+      @apply bg-slate-900/60 backdrop-blur-xl border border-white/10 shadow-[0_8px_32px_0_rgba(0,0,0,0.5)] rounded-3xl relative overflow-hidden;
+  }
+
+  .glass-input {
+      @apply w-full bg-black/30 border border-white/10 text-white placeholder-white/30 rounded-xl px-4 py-3 outline-none transition-all duration-300 focus:bg-black/50 focus:border-neon-secondary/50 focus:shadow-[0_0_15px_rgba(139,92,246,0.2)];
   }
 
   /* Custom Loading Spinner */
@@ -55,6 +59,26 @@
   @keyframes spin {
       to { transform: rotate(360deg); }
   }
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.1);
+}
+
+::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 3px;
+    transition: background 0.2s ease;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.3);
 }
 
 /* Animations */
