@@ -31,7 +31,7 @@ const WheelCanvas = ({ items, onSpinEnd, isSpinning, spinTrigger, width = 500, h
                 return new Promise((resolve) => {
                     const img = new Image();
                     const path = item.posterPath.startsWith('/') ? item.posterPath : `/${item.posterPath}`;
-                    img.src = `https://image.tmdb.org/t/p/original${path}`;
+                    img.src = `https://image.tmdb.org/t/p/w780${path}`;
                     
                     img.onload = () => {
                         newImagesToProps[key] = img;

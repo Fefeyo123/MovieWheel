@@ -232,10 +232,12 @@ function AppContent() {
                 <motion.div 
                     layout
                     transition={{ type: "spring", stiffness: 40, damping: 15 }}
-                    className={`z-20
+                    className={`z-20 left-1/2 -translate-x-1/2
                         ${isGenrePhase 
-                            ? 'relative w-auto h-[80%] aspect-square max-h-[400px]' 
-                            : 'absolute left-1/2 -translate-x-1/2 top-full -translate-y-[30%] w-[115vh] h-[115vh] sm:w-[min(1000px,115vh)] sm:h-[min(1000px,115vh)]'
+                            // Genre fase: netjes in het midden, niet te groot
+                            ? 'relative w-[90vw] max-w-[400px] aspect-square' 
+                            // Film fase: Vast aan de onderkant, breedte vult scherm + beetje extra voor de curve
+                            : 'fixed bottom-[-45vw] w-[120vw] h-[120vw] sm:bottom-[-35vh] sm:w-[100vh] sm:h-[100vh]'
                         }
                     `}
                 >
@@ -258,9 +260,9 @@ function AppContent() {
                             items={currentWheelItems} 
                             onSpinEnd={isGenrePhase ? onGenreSpinEnd : onMovieSpinEnd}
                             spinTrigger={spinTrigger}
-                            width={3600}
-                            height={3600}
-                            fontSize={isGenrePhase ? 240 : 72}
+                            width={1500}
+                            height={1500}
+                            fontSize={isGenrePhase ? 80 : 24}
                             colors={isGenrePhase ? GENRE_COLORS : undefined}
                             isDonut={!isGenrePhase}
                         />
@@ -271,11 +273,12 @@ function AppContent() {
                         onClick={handleSpin}
                         whileHover={{ scale: 1.1 }}
                         whileTap={{ scale: 0.9 }} 
-                        className={`absolute left-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full cursor-pointer z-30 flex items-center justify-center transition-all duration-1000 ease-[cubic-bezier(0.2,0.8,0.2,1)] group
-                            /* Dynamic Styles based on Phase */
+                        className={`absolute left-1/2 -translate-x-1/2 rounded-full cursor-pointer z-30 flex items-center justify-center transition-all duration-1000 group
                             ${isGenrePhase 
-                                ? 'top-1/2 w-[90px] h-[90px] sm:w-[110px] sm:h-[110px]'
-                                : 'top-[-13%] w-[80px] h-[80px] sm:top-[-90px] sm:w-[110px] sm:h-[110px]'
+                                // Genre fase: Knop in het midden
+                                ? 'top-1/2 -translate-y-1/2 w-[90px] h-[90px] sm:w-[110px] sm:h-[110px]'
+                                // Film fase: Knop 110px BOVEN het wiel (zweeft nu onder de titel)
+                                : '-top-[110px] w-[80px] h-[80px] sm:-top-[140px] sm:w-[100px] sm:h-[100px]'
                             }
                         `}
                     >
