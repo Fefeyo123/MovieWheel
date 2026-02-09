@@ -1,10 +1,10 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { WHEEL_COLORS } from '../../utils/constants';
 import { adjustColorBrightness, wrapText, getIndexAtTop } from '../../utils/helpers';
 
 const WheelCanvas = ({ items, onSpinEnd, isSpinning, spinTrigger, width = 500, height = 500, fontSize, colors, isDonut = false, imageCache = {} }) => {
     const canvasRef = useRef(null);
-    const offscreenCanvasRef = useRef(null); // Offscreen canvas for static wheel
+    const offscreenCanvasRef = useRef(null);
     
     const stateRef = useRef({
         angle: 0,
@@ -13,9 +13,10 @@ const WheelCanvas = ({ items, onSpinEnd, isSpinning, spinTrigger, width = 500, h
         lastFrameTime: 0
     });
 
+    // Local images state (fallback if not in cache)
     const [images, setImages] = useState({});
 
-    // Load images when items change, with caching
+    // 1. Load images logic - Alleen als ze NIET in de cache zitten
     useEffect(() => {
         const loadImages = async () => {
             const newImagesToProps = {};
@@ -23,20 +24,27 @@ const WheelCanvas = ({ items, onSpinEnd, isSpinning, spinTrigger, width = 500, h
 
             const promises = itemsWithPosters.map((item) => {
                 const key = item.value || item.label;
-                const path = item.posterPath.startsWith('/') ? item.posterPath : `/${item.posterPath}`;
+                const rawPath = item.posterPath;
+                
+                // Slimme Cache Check: Probeer met én zonder slash
+                const slashPath = rawPath.startsWith('/') ? rawPath : `/${rawPath}`;
+                const noSlashPath = rawPath.startsWith('/') ? rawPath.slice(1) : rawPath;
+                
+                // Als we hem al hebben (lokaal of in cache), doe niets
+                if (images[key] || imageCache[slashPath] || imageCache[noSlashPath]) {
+                    return Promise.resolve();
+                }
 
-                // CHECK: Hebben we hem lokaal OF in de cache van buitenaf?
-                if (images[key] || imageCache[path]) return Promise.resolve();
-
+                // Anders: downloaden (fallback)
                 return new Promise((resolve) => {
-                    // ... (bestaande laad logica voor als het plaatje écht mist)
                     const img = new Image();
-                    img.src = `https://image.tmdb.org/t/p/w780${path}`;
+                    img.src = `https://image.tmdb.org/t/p/w780${slashPath}`;
+                    
                     img.onload = () => {
                         newImagesToProps[key] = img;
                         resolve();
                     };
-                    img.onerror = resolve;
+                    img.onerror = () => resolve(); 
                 });
             });
 
@@ -51,17 +59,16 @@ const WheelCanvas = ({ items, onSpinEnd, isSpinning, spinTrigger, width = 500, h
     }, [items, images, imageCache]);
 
 
-    // Draw the STATIC part of the wheel to the offscreen canvas
+    // 2. Draw Static Wheel - Nu met useLayoutEffect om "flicker" te voorkomen
     const drawStaticWheel = () => {
         if (!offscreenCanvasRef.current) {
             offscreenCanvasRef.current = document.createElement('canvas');
         }
         
         const ctx = offscreenCanvasRef.current.getContext('2d');
-        const size = width; // Use prop width/height
-        const scale = size / 1200; // Base scale on 1200px design
+        const size = width;
+        const scale = size / 1200; 
 
-        // Update offscreen canvas size if needed (clears it too)
         if (offscreenCanvasRef.current.width !== size || offscreenCanvasRef.current.height !== size) {
              offscreenCanvasRef.current.width = size;
              offscreenCanvasRef.current.height = size;
@@ -77,7 +84,7 @@ const WheelCanvas = ({ items, onSpinEnd, isSpinning, spinTrigger, width = 500, h
         ctx.save();
         ctx.translate(center, center);
 
-        // 1. Draw Outer Rim / Bezel
+        // Outer Rim
         ctx.save();
         ctx.beginPath();
         ctx.arc(0, 0, radius + (15 * scale), 0, 2 * Math.PI);
@@ -98,13 +105,16 @@ const WheelCanvas = ({ items, onSpinEnd, isSpinning, spinTrigger, width = 500, h
             const segmentAngle = i * arc;
             const color = effectiveColors[i % effectiveColors.length];
             const itemKey = typeof item === 'object' ? (item.value || item.label) : item;
+            
+            // HIER IS DE SLIMME LOOKUP:
             let img = images[itemKey];
             if (!img && typeof item === 'object' && item.posterPath) {
-                const path = item.posterPath.startsWith('/') ? item.posterPath : `/${item.posterPath}`;
-                img = imageCache[path];
+                const rawPath = item.posterPath;
+                const slashPath = rawPath.startsWith('/') ? rawPath : `/${rawPath}`;
+                const noSlashPath = rawPath.startsWith('/') ? rawPath.slice(1) : rawPath;
+                img = imageCache[slashPath] || imageCache[noSlashPath];
             }
 
-            // 2. Draw Segment with Radial Gradient
             ctx.beginPath();
             ctx.moveTo(0, 0);
             ctx.arc(0, 0, radius, segmentAngle, segmentAngle + arc);
@@ -130,19 +140,16 @@ const WheelCanvas = ({ items, onSpinEnd, isSpinning, spinTrigger, width = 500, h
                 ctx.fill();
             }
             
-            // Segment Border
             ctx.strokeStyle = 'rgba(0,0,0,0.5)';
             ctx.lineWidth = 1 * scale;
             ctx.stroke();
 
-            // 3. Draw Text
             if (!img) {
                 ctx.save();
-                ctx.translate(Math.cos(segmentAngle + arc / 2) * (radius * 0.60), 
-                                 Math.sin(segmentAngle + arc / 2) * (radius * 0.60));
+                ctx.translate(Math.cos(segmentAngle + arc / 2) * (radius * 0.75), 
+                                 Math.sin(segmentAngle + arc / 2) * (radius * 0.75));
                 ctx.rotate(segmentAngle + arc / 2);
                 ctx.fillStyle = '#FFFFFF';
-                // Adaptive font size
                 const calculatedFontSize = fontSize || (24 * scale);
                 ctx.font = `bold ${calculatedFontSize}px Outfit, sans-serif`; 
                 ctx.textAlign = 'center';
@@ -162,16 +169,17 @@ const WheelCanvas = ({ items, onSpinEnd, isSpinning, spinTrigger, width = 500, h
              ctx.restore();
         });
         
-        ctx.restore(); // End translation
+        ctx.restore();
     };
 
-    // Re-render static wheel when dependencies change
-    useEffect(() => {
+    // Gebruik useLayoutEffect zodat hij tekent VOORDAT de browser de nieuwe frame laat zien.
+    // Dit voorkomt dat je eerst tekst ziet en dan pas plaatjes.
+    useLayoutEffect(() => {
         drawStaticWheel();
-    }, [items, images, width, height, colors, fontSize, isDonut]);
+    }, [items, images, width, height, colors, fontSize, isDonut, imageCache]);
 
 
-    // Main Draw Function (Animation Loop) - Draws the transformed static image
+    // Main Draw Function (Animation Loop)
     const draw = (ctx, angle) => {
         const size = ctx.canvas.width;
         const scale = size / 1200;
@@ -180,12 +188,10 @@ const WheelCanvas = ({ items, onSpinEnd, isSpinning, spinTrigger, width = 500, h
 
         ctx.clearRect(0, 0, size, size);
 
-        // 1. Draw Offscreen Static Wheel (Rotated)
         if (offscreenCanvasRef.current) {
             ctx.save();
             ctx.translate(center, center);
             ctx.rotate(angle);
-            // Draw the pre-rendered wheel, centered
             ctx.drawImage(offscreenCanvasRef.current, -center, -center);
             ctx.restore();
         }
@@ -196,20 +202,11 @@ const WheelCanvas = ({ items, onSpinEnd, isSpinning, spinTrigger, width = 500, h
         if (calculatedInner < 50 * scale) calculatedInner = 50 * scale;
         const innerRadius = isDonut ? calculatedInner : (80 * scale);
 
-
         if (isDonut) {
-            // Donut: Find current winner to show in center
             const idx = getIndexAtTop(angle, items.length);
             const centerItem = items[idx];
             const centerItemKey = centerItem ? ((typeof centerItem === 'string') ? centerItem : (centerItem.value || centerItem.label)) : null;
-            const cImgLocal = images[centerItemKey];
-            let cImg = cImgLocal;
-            if (!cImg && centerItem && centerItem.posterPath) {
-                const path = centerItem.posterPath.startsWith('/') ? centerItem.posterPath : `/${centerItem.posterPath}`;
-                cImg = imageCache[path];
-            }
             
-            // Draw circle over the center to create "hole"
             ctx.save();
             ctx.translate(center, center);
             ctx.beginPath();
@@ -220,27 +217,30 @@ const WheelCanvas = ({ items, onSpinEnd, isSpinning, spinTrigger, width = 500, h
             ctx.lineWidth = 4 * scale;
             ctx.stroke();
             
-            // Draw Center Poster
+            // Draw Center Poster from Cache
+            let cImg = images[centerItemKey];
+            if (!cImg && centerItem && centerItem.posterPath) {
+                 const rawPath = centerItem.posterPath;
+                 const slashPath = rawPath.startsWith('/') ? rawPath : `/${rawPath}`;
+                 const noSlashPath = rawPath.startsWith('/') ? rawPath.slice(1) : rawPath;
+                 cImg = imageCache[slashPath] || imageCache[noSlashPath];
+            }
+
             if (cImg) {
                  ctx.save();
                  ctx.clip(); 
-                 
                  const imgRatio = cImg.height / cImg.width;
                  const drawW = innerRadius * 2;
                  const drawH = drawW * imgRatio;
-                 
                  ctx.drawImage(cImg, -drawW/2, -innerRadius, drawW, drawH);
                  
-                 // Vignette
                  const gradient = ctx.createRadialGradient(0, 0, innerRadius * 0.7, 0, 0, innerRadius);
                  gradient.addColorStop(0, 'rgba(0,0,0,0)');
                  gradient.addColorStop(1, 'rgba(0,0,0,0.8)');
                  ctx.fillStyle = gradient;
                  ctx.fillRect(-innerRadius, -innerRadius, innerRadius*2, innerRadius*2);
-                 
                  ctx.restore();
             } else if (centerItem) {
-                 // Fallback text
                 ctx.fillStyle = '#FFF';
                 ctx.font = `bold ${40 * scale}px Outfit, sans-serif`;
                 ctx.textAlign = 'center';
@@ -248,10 +248,8 @@ const WheelCanvas = ({ items, onSpinEnd, isSpinning, spinTrigger, width = 500, h
                 const label = (typeof centerItem === 'string') ? centerItem : (centerItem.label || centerItem);
                 wrapText(ctx, label, 0, 0, innerRadius * 1.5, (40 * scale) + (5 * scale));
             }
-            
             ctx.restore();
         } else {
-             // 4. Inner Decoration (Non-donut)
             ctx.save();
             ctx.translate(center, center);
             ctx.beginPath();
@@ -262,20 +260,16 @@ const WheelCanvas = ({ items, onSpinEnd, isSpinning, spinTrigger, width = 500, h
             ctx.restore();
         }
 
-        // 5. Glass Overlay / Shine
         const shineGradient = ctx.createLinearGradient(0, 0, size, size);
         shineGradient.addColorStop(0, 'rgba(255,255,255,0.05)');
         shineGradient.addColorStop(0.5, 'rgba(255,255,255,0)');
         shineGradient.addColorStop(1, 'rgba(255,255,255,0.02)');
-        
         ctx.fillStyle = shineGradient;
         ctx.beginPath();
-        // Donut shine: Ring only
         ctx.arc(center, center, radius, 0, 2 * Math.PI);
-        ctx.arc(center, center, innerRadius, 0, 2 * Math.PI, true); // Counter-clockwise to create hole
+        ctx.arc(center, center, innerRadius, 0, 2 * Math.PI, true); 
         ctx.fill();
         
-        // Circular highlight ring (Outer)
         ctx.beginPath();
         ctx.arc(center, center, radius - 2 * scale, 0, 2 * Math.PI);
         ctx.strokeStyle = 'rgba(255,255,255,0.1)';
@@ -285,16 +279,12 @@ const WheelCanvas = ({ items, onSpinEnd, isSpinning, spinTrigger, width = 500, h
 
     const determineWinner = (finalAngle) => {
         const arc = (2 * Math.PI) / items.length;
-        // Pointer is at 270deg (3PI/2)
-        // pointer_theta = (3PI/2 - final_angle) % 2PI
         let pointerAngle = (1.5 * Math.PI - finalAngle) % (2 * Math.PI);
         if (pointerAngle < 0) pointerAngle += 2 * Math.PI;
-
         const index = Math.floor(pointerAngle / arc);
         return items[index];
     };
 
-    // Animation Loop
     useEffect(() => {
         const canvas = canvasRef.current;
         const ctx = canvas.getContext('2d');
@@ -302,7 +292,6 @@ const WheelCanvas = ({ items, onSpinEnd, isSpinning, spinTrigger, width = 500, h
 
         const animate = (time) => {
             const state = stateRef.current;
-            
             if (state.isSpinning) {
                 if (state.velocity < 0.002) {
                     state.isSpinning = false;
@@ -315,16 +304,13 @@ const WheelCanvas = ({ items, onSpinEnd, isSpinning, spinTrigger, width = 500, h
                     state.angle %= (2 * Math.PI);
                 }
             }
-
             draw(ctx, state.angle);
             animationId = requestAnimationFrame(animate);
         };
-
         animationId = requestAnimationFrame(animate);
         return () => cancelAnimationFrame(animationId);
-    }, [items, onSpinEnd, width, height, images]); // Re-bind if size changes or images load
+    }, [items, onSpinEnd, width, height, images, imageCache]); // imageCache toegevoegd
 
-    // Spin Trigger
     useEffect(() => {
         if (spinTrigger) {
              const state = stateRef.current;
@@ -335,13 +321,13 @@ const WheelCanvas = ({ items, onSpinEnd, isSpinning, spinTrigger, width = 500, h
         }
     }, [spinTrigger]);
 
-    // Initial draw
-    useEffect(() => {
+    // Initial paint on mount
+    useLayoutEffect(() => {
         if(canvasRef.current) {
             const ctx = canvasRef.current.getContext('2d');
             draw(ctx, stateRef.current.angle);
         }
-    }, [items, width, height]);
+    }, [items, width, height, images, imageCache]);
 
     return (
         <canvas 

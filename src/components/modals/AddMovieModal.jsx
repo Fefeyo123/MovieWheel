@@ -13,7 +13,7 @@ const AddMovieModal = ({ onClose, currentUser }) => {
     const [results, setResults] = useState([]);
     const [genresMap, setGenresMap] = useState({});
     const [loading, setLoading] = useState(false);
-    const [warning, setWarning] = useState(null); // { type, message, onConfirm, onCancel }
+    const [warning, setWarning] = useState(null); // Structure: { type, message, onConfirm, onCancel }
 
     useEffect(() => {
         getGenres().then(genres => {
@@ -29,8 +29,7 @@ const AddMovieModal = ({ onClose, currentUser }) => {
                 setLoading(true);
                 
                 let safeQuery = query;
-                // TMDB has trouble with "wall-e" and "wall e", but "WALL·E" (with the dot) works.
-                // Catch variations like "wall-e", "walle", "wall e" and force the working query.
+                // Handle TMDB search quirks (e.g., "WALL·E" vs "wall-e")
                 const normalized = query.toLowerCase().replace(/[^a-z0-9]/g, '');
 
                 if (normalized === 'walle') {
@@ -38,9 +37,8 @@ const AddMovieModal = ({ onClose, currentUser }) => {
                 }
 
                 searchMovies(safeQuery).then(res => {
-                    // Sort by popularity to ensure hits like "WALL-E" come up first
+                    // Sort by popularity and normalize results
                     const sorted = res.sort((a, b) => b.popularity - a.popularity);
-                    // Normalize results immediately
                     const normalizedResults = sorted.map(movie => normalizeTmdbMovie(movie, genresMap));
                     setResults(normalizedResults);
                     setLoading(false);
@@ -54,7 +52,7 @@ const AddMovieModal = ({ onClose, currentUser }) => {
     }, [query]);
 
     const addSingleMovie = async (movie, collectionData = null, forcedGenreIds = null) => {
-         // Check if movie exists
+         // Check if movie already exists
         const { data: existingMovies } = await supabase
             .from('movies')
             .select('*')
@@ -65,7 +63,7 @@ const AddMovieModal = ({ onClose, currentUser }) => {
             if (existing.status === 'queued') {
                 return { status: 'exists', title: movie.title };
             } else if (existing.status === 'watched') {
-                 // Reactivate
+                 // Reactivate existing movie
                 const { error } = await supabase
                     .from('movies')
                     .update({ status: 'queued', added_by: currentUser })
@@ -74,8 +72,7 @@ const AddMovieModal = ({ onClose, currentUser }) => {
             }
         }
 
-        // Map genre IDs to text
-        // Use forcedGenreIds if provided (for collections), otherwise fall back to movie data
+        // Map genre IDs to text (using forcedGenreIds for collections)
         let genreIds = forcedGenreIds || movie.genre_ids;
         if (!genreIds && movie.genres) genreIds = movie.genres.map(g => g.id); // Handling detail response
 
@@ -84,7 +81,7 @@ const AddMovieModal = ({ onClose, currentUser }) => {
         
         const normalizedSet = new Set();
         
-        // Helper to normalize a single genre string
+        // Normalize genre string
         const normalize = (gName) => {
             if (gName.includes("Action") || gName.includes("Adventure")) return "Action";
             if (gName.includes("Sci-Fi") || gName.includes("Science")) return "Sci-Fi";
@@ -129,7 +126,7 @@ const AddMovieModal = ({ onClose, currentUser }) => {
             return;
         }
 
-        // 1. Fetch full details to check collection
+        // Fetch full details to check collection membership
         const fullMovie = await getMovieDetails(basicMovie.id);
         if (!fullMovie) {
              // Fallback to basic add if fetch fails
@@ -156,7 +153,7 @@ const AddMovieModal = ({ onClose, currentUser }) => {
                        const validParts = [];
                        const allGenreIds = new Set();
                        
-                       // 1. Identify valid parts and collect ALL genres
+                       // Identify valid parts and collect all genres
                        for (const part of colDetails.parts) {
                            // validation: Skip if no release date or released in future
                            if (!part.release_date) continue;
@@ -173,7 +170,7 @@ const AddMovieModal = ({ onClose, currentUser }) => {
                        
                        const unifiedGenreIds = Array.from(allGenreIds);
 
-                       // 2. Add parts with unified genres
+                       // Add parts with unified genres
                        for (const part of validParts) {
                            const res = await addSingleMovie(part, { id: collection.id, name: collection.name }, unifiedGenreIds);
                            if (res.status === 'success' || res.status === 'reactivated') addedCount++;

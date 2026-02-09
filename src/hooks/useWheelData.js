@@ -1,12 +1,12 @@
 import { useMemo } from 'react';
 
 const useWheelData = (movies, selectedGenre) => {
-    // 1. Filter movies that are in the queue (not watched)
+    // Filter movies that are in the queue (not watched)
     const queuedMovies = useMemo(() => {
         return movies.filter(m => !m.status || m.status === 'queued');
     }, [movies]);
 
-    // 2. Derive available genres from queued movies
+    // Derive available genres from queued movies
     const availableGenres = useMemo(() => {
         if (queuedMovies.length > 0) {
             const dbGenres = new Set();
@@ -20,7 +20,7 @@ const useWheelData = (movies, selectedGenre) => {
         return []; // Return empty array if no queued movies
     }, [queuedMovies]);
 
-    // 3. Grouping Logic for Wheel (Movies + Collections)
+    // Grouping Logic for Wheel (Movies + Collections)
     const { moviesInGenre, wheelItemsSet } = useMemo(() => {
         const filtered = queuedMovies.filter(m => m.genre.includes(selectedGenre));
 
@@ -47,7 +47,7 @@ const useWheelData = (movies, selectedGenre) => {
         return { moviesInGenre: filtered, wheelItemsSet: itemsSet };
     }, [queuedMovies, selectedGenre]);
 
-    // 4. Generate Final Wheel Items
+    // Generate Final Wheel Items
     const effectiveMovieItems = useMemo(() => {
         const items = [];
         if (wheelItemsSet.size > 0) {

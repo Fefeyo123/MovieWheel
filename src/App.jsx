@@ -53,9 +53,7 @@ function AppContent() {
                     const currentMovie = prev[index];
                     const newData = { ...payload.new, genre: parseGenre(payload.new.genre) };
 
-                    // RACE CONDITION FIX:
-                    // If the critical data (status) is already the same, ignore this update
-                    // to prevent a "flicker" or overwriting a more recent local optimistic update.
+                    // Prevent race conditions by ignoring updates if the status is already consistent
                     if (currentMovie.status === newData.status) {
                         return prev;
                     }
@@ -106,28 +104,27 @@ function AppContent() {
         
         if (timeoutRef.current) clearTimeout(timeoutRef.current);
         
-        // 1. Zoek films
+        // Filter movies matching the selected genre
         const relevantMovies = queuedMovies.filter(m => {
              const g = m.genre; 
              return Array.isArray(g) ? g.includes(genre) : g === genre;
         });
 
-        // 2. Pak paden
+        // Collect poster paths
         const paths = relevantMovies
             .map(m => m.poster_path)
             .filter(path => path);
 
-        // 3. Start timer én download (die nu de images teruggeeft!)
+        // Preload images with a minimum delay for UX
         const minDelay = new Promise(resolve => setTimeout(resolve, 800));
-        const imageLoading = preloadImages(paths); // Dit is nu een promise die een map teruggeeft
+        const imageLoading = preloadImages(paths);
 
-        // Wacht op beide
         const [_, loadedImagesMap] = await Promise.all([minDelay, imageLoading]);
         
-        // 4. Sla de geladen images op in de cache
+        // Update image cache
         setImageCache(prev => ({ ...prev, ...loadedImagesMap }));
 
-        // 5. Ga door
+        // Transition to next phase
         setPhase('movies');
         setSpinTrigger(0); 
     }, [queuedMovies]);
@@ -175,7 +172,7 @@ function AppContent() {
             m.id === selectedMovie.id ? { ...m, status: 'watched' } : m
         ));
 
-        // Start reset flow optimistically as well for snappiness
+        // Reset UI immediately
         reset();
 
         const { error } = await supabase
@@ -186,10 +183,8 @@ function AppContent() {
         if (error) {
             console.error('Error marking as watched:', error);
             alert("Failed to mark as watched.");
-            // Revert on error
             setMovies(previousMovies);
         } 
-        // No else needed, we already reset
     };
 
     const handleToggleWatched = async (movie) => {
@@ -209,7 +204,6 @@ function AppContent() {
         if (error) {
             console.error('Error updating status:', error);
             alert("Failed to update status.");
-            // Revert on error
             setMovies(previousMovies);
         }
     };
@@ -218,7 +212,7 @@ function AppContent() {
         if (!await confirm(`Remove "${movie.title}" from the queue?`, {
             title: 'Remove Movie',
             confirmText: 'Delete',
-            type: 'error' // Makes the button red
+            type: 'error'
         })) return;
 
         // Optimistic Update
@@ -233,7 +227,6 @@ function AppContent() {
         if (error) {
             console.error("Error deleting movie:", error);
             alert("Failed to delete movie.");
-            // Revert
             setMovies(previousMovies);
         }
     };
@@ -249,21 +242,18 @@ function AppContent() {
             />
 
             <main className="w-full flex-grow relative flex flex-col items-center justify-center">
-                {/* UNIFIED WHEEL CONTAINER */}
+                {/* Unified Wheel Container */}
                 <motion.div 
                     layout
-                    transition={{ type: "spring", stiffness: 40, damping: 15 }}
+                    transition={{ duration: 0.8, ease: [0.2, 0.8, 0.2, 1] }}
                     className={`z-20
                             ${isGenrePhase 
-                                // Genre fase: GEEN left/translate, Flexbox centreert hem al
                                 ? 'relative w-[90vw] max-w-[400px] aspect-square' 
-                                
-                                // Film fase: WEL left/translate nodig omdat hij 'fixed' is
                                 : 'fixed bottom-[-40vw] left-1/2 -translate-x-1/2 w-[120vw] h-[120vw] sm:bottom-[-50vh] sm:w-[100vh] sm:h-[100vh]'
                             }
                         `}
                 >
-                     {/* Static decorations that scale with container */}
+                     {/* Static decorations */}
                     <div className={`absolute -top-[25px] left-1/2 -translate-x-1/2 z-10 drop-shadow-md pointer-events-none transition-all duration-1000
                          ${isGenrePhase 
                             ? 'w-[40px] h-[50px]' 
@@ -285,22 +275,20 @@ function AppContent() {
                             spinTrigger={spinTrigger}
                             width={1500}
                             height={1500}
-                            fontSize={isGenrePhase ? 80 : 24}
+                            fontSize={isGenrePhase ? 70 : 24}
                             colors={isGenrePhase ? GENRE_COLORS : undefined}
                             isDonut={!isGenrePhase}
                         />
                     </div>
 
-                    {/* SPIN BUTTON */}
+                    {/* Spin Button */}
                     <motion.button 
                         onClick={handleSpin}
                         whileHover={{ scale: 1.1 }}
                         whileTap={{ scale: 0.9 }} 
                         className={`absolute left-1/2 -translate-x-1/2 rounded-full cursor-pointer z-30 flex items-center justify-center transition-all duration-1000 group
                             ${isGenrePhase 
-                                // Genre fase: Knop in het midden
                                 ? 'top-1/2 -translate-y-1/2 w-[90px] h-[90px] sm:w-[110px] sm:h-[110px]'
-                                // Film fase: Knop 110px BOVEN het wiel (zweeft nu onder de titel)
                                 : '-top-[110px] w-[80px] h-[80px] sm:-top-[140px] sm:w-[100px] sm:h-[100px]'
                             }
                         `}
@@ -326,7 +314,7 @@ function AppContent() {
                         </div>
                     </motion.button>
                     
-                    {/* Shadow/Glow behind wheel for depth */}
+                    {/* Shadow/Glow behind wheel */}
                     <div 
                          className={`absolute inset-0 rounded-full transition-shadow duration-1000 -z-10
                          ${isGenrePhase 
