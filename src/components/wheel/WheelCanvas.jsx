@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { WHEEL_COLORS } from '../../utils/constants';
 import { adjustColorBrightness, wrapText, getIndexAtTop } from '../../utils/helpers';
 
-const WheelCanvas = ({ items, onSpinEnd, isSpinning, spinTrigger, width = 500, height = 500, fontSize, colors, isDonut = false }) => {
+const WheelCanvas = ({ items, onSpinEnd, isSpinning, spinTrigger, width = 500, height = 500, fontSize, colors, isDonut = false, imageCache = {} }) => {
     const canvasRef = useRef(null);
     const offscreenCanvasRef = useRef(null); // Offscreen canvas for static wheel
     
@@ -21,38 +21,34 @@ const WheelCanvas = ({ items, onSpinEnd, isSpinning, spinTrigger, width = 500, h
             const newImagesToProps = {};
             const itemsWithPosters = items.filter(item => item && typeof item === 'object' && item.posterPath);
 
-            // Identify which images we actually need to load
             const promises = itemsWithPosters.map((item) => {
                 const key = item.value || item.label;
-                
-                // If we already have this image loaded, skip it
-                if (images[key]) return Promise.resolve();
+                const path = item.posterPath.startsWith('/') ? item.posterPath : `/${item.posterPath}`;
+
+                // CHECK: Hebben we hem lokaal OF in de cache van buitenaf?
+                if (images[key] || imageCache[path]) return Promise.resolve();
 
                 return new Promise((resolve) => {
+                    // ... (bestaande laad logica voor als het plaatje écht mist)
                     const img = new Image();
-                    const path = item.posterPath.startsWith('/') ? item.posterPath : `/${item.posterPath}`;
                     img.src = `https://image.tmdb.org/t/p/w780${path}`;
-                    
                     img.onload = () => {
                         newImagesToProps[key] = img;
                         resolve();
                     };
-                    img.onerror = () => {
-                        resolve(); 
-                    };
+                    img.onerror = resolve;
                 });
             });
 
             await Promise.all(promises);
 
-            // Only update state if we actually loaded something new
             if (Object.keys(newImagesToProps).length > 0) {
                 setImages(prev => ({ ...prev, ...newImagesToProps }));
             }
         };
 
         loadImages();
-    }, [items, images]); // 'images' dependency prevents stale closure, but logic prevents inf loop
+    }, [items, images, imageCache]);
 
 
     // Draw the STATIC part of the wheel to the offscreen canvas
@@ -102,7 +98,11 @@ const WheelCanvas = ({ items, onSpinEnd, isSpinning, spinTrigger, width = 500, h
             const segmentAngle = i * arc;
             const color = effectiveColors[i % effectiveColors.length];
             const itemKey = typeof item === 'object' ? (item.value || item.label) : item;
-            const img = images[itemKey];
+            let img = images[itemKey];
+            if (!img && typeof item === 'object' && item.posterPath) {
+                const path = item.posterPath.startsWith('/') ? item.posterPath : `/${item.posterPath}`;
+                img = imageCache[path];
+            }
 
             // 2. Draw Segment with Radial Gradient
             ctx.beginPath();
@@ -202,6 +202,12 @@ const WheelCanvas = ({ items, onSpinEnd, isSpinning, spinTrigger, width = 500, h
             const idx = getIndexAtTop(angle, items.length);
             const centerItem = items[idx];
             const centerItemKey = centerItem ? ((typeof centerItem === 'string') ? centerItem : (centerItem.value || centerItem.label)) : null;
+            const cImgLocal = images[centerItemKey];
+            let cImg = cImgLocal;
+            if (!cImg && centerItem && centerItem.posterPath) {
+                const path = centerItem.posterPath.startsWith('/') ? centerItem.posterPath : `/${centerItem.posterPath}`;
+                cImg = imageCache[path];
+            }
             
             // Draw circle over the center to create "hole"
             ctx.save();
@@ -215,7 +221,6 @@ const WheelCanvas = ({ items, onSpinEnd, isSpinning, spinTrigger, width = 500, h
             ctx.stroke();
             
             // Draw Center Poster
-            const cImg = images[centerItemKey];
             if (cImg) {
                  ctx.save();
                  ctx.clip(); 

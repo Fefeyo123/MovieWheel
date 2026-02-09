@@ -63,3 +63,31 @@ export const getIndexAtTop = (currentAngle, totalItems) => {
 
     return Math.floor(pointerAngle / arc);
 };
+
+export const preloadImages = (posterPaths) => {
+    const promises = posterPaths.map((path) => {
+        return new Promise((resolve) => {
+            const img = new Image();
+            // Zorg voor exact hetzelfde pad als in WheelCanvas
+            const cleanPath = path.startsWith('/') ? path : `/${path}`;
+            const fullUrl = `https://image.tmdb.org/t/p/w780${cleanPath}`;
+            
+            img.src = fullUrl;
+            
+            // We lossen op met een objectje: { path: cleanPath, img: img }
+            img.onload = () => resolve({ path: cleanPath, img });
+            img.onerror = () => resolve({ path: cleanPath, img: null }); 
+        });
+    });
+
+    return Promise.all(promises).then(results => {
+        // Zet de array om naar een lookup object: { "/pad.jpg": ImageObject }
+        const cache = {};
+        results.forEach(res => {
+            if (res.img) {
+                cache[res.path] = res.img;
+            }
+        });
+        return cache;
+    });
+};

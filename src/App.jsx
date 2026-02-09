@@ -6,7 +6,7 @@ import Header from './components/common/Header';
 import ResultModal from './components/modals/ResultModal';
 import { supabase } from './utils/supabaseClient';
 import { THE_BOIS, GENRE_COLORS } from './utils/constants';
-import { parseGenre } from './utils/helpers';
+import { parseGenre, preloadImages } from './utils/helpers';
 import useWheelData from './hooks/useWheelData';
 import { UIProvider, useUI } from './context/UIContext';
 import './index.css';
@@ -18,6 +18,7 @@ function AppContent() {
     const [selectedMovie, setSelectedMovie] = useState(null);
     const [spinTrigger, setSpinTrigger] = useState(0);
     const [wheelOpacity, setWheelOpacity] = useState(1);
+    const [imageCache, setImageCache] = useState({});
     
     // Data
     const [movies, setMovies] = useState([]);
@@ -100,16 +101,36 @@ function AppContent() {
         };
     }, []);
 
-    const onGenreSpinEnd = React.useCallback((genre) => {
+    const onGenreSpinEnd = React.useCallback(async (genre) => {
         setSelectedGenre(genre);
         
         if (timeoutRef.current) clearTimeout(timeoutRef.current);
         
-        timeoutRef.current = setTimeout(() => {
-            setPhase('movies');
-            setSpinTrigger(0); 
-        }, 800);
-    }, []);
+        // 1. Zoek films
+        const relevantMovies = queuedMovies.filter(m => {
+             const g = m.genre; 
+             return Array.isArray(g) ? g.includes(genre) : g === genre;
+        });
+
+        // 2. Pak paden
+        const paths = relevantMovies
+            .map(m => m.poster_path)
+            .filter(path => path);
+
+        // 3. Start timer én download (die nu de images teruggeeft!)
+        const minDelay = new Promise(resolve => setTimeout(resolve, 800));
+        const imageLoading = preloadImages(paths); // Dit is nu een promise die een map teruggeeft
+
+        // Wacht op beide
+        const [_, loadedImagesMap] = await Promise.all([minDelay, imageLoading]);
+        
+        // 4. Sla de geladen images op in de cache
+        setImageCache(prev => ({ ...prev, ...loadedImagesMap }));
+
+        // 5. Ga door
+        setPhase('movies');
+        setSpinTrigger(0); 
+    }, [queuedMovies]);
 
     const onMovieSpinEnd = React.useCallback((item) => {
         const resultText = item.value || item; 
@@ -259,6 +280,7 @@ function AppContent() {
                     <div className="w-full h-full transition-opacity duration-300 ease-in-out" style={{ opacity: wheelOpacity }}>
                         <WheelCanvas 
                             items={currentWheelItems} 
+                            imageCache={imageCache}
                             onSpinEnd={isGenrePhase ? onGenreSpinEnd : onMovieSpinEnd}
                             spinTrigger={spinTrigger}
                             width={1500}
