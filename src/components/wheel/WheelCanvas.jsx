@@ -1,5 +1,5 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { WHEEL_COLORS } from '../../utils/constants';
+import { WHEEL_COLORS, WHEEL_CONFIG, TMDB_CONFIG } from '../../utils/constants';
 import { adjustColorBrightness, wrapText, getIndexAtTop } from '../../utils/helpers';
 
 const WheelCanvas = ({ items, onSpinEnd, isSpinning, spinTrigger, width = 500, height = 500, fontSize, colors, isDonut = false, imageCache = {} }) => {
@@ -38,7 +38,8 @@ const WheelCanvas = ({ items, onSpinEnd, isSpinning, spinTrigger, width = 500, h
                 // Anders: downloaden (fallback)
                 return new Promise((resolve) => {
                     const img = new Image();
-                    img.src = `https://image.tmdb.org/t/p/w780${slashPath}`;
+                    const fullUrl = `${TMDB_CONFIG.IMAGE_BASE_URL}${TMDB_CONFIG.POSTER_SIZE}${slashPath}`;
+                    img.src = fullUrl;
                     
                     img.onload = () => {
                         newImagesToProps[key] = img;
@@ -67,7 +68,7 @@ const WheelCanvas = ({ items, onSpinEnd, isSpinning, spinTrigger, width = 500, h
         
         const ctx = offscreenCanvasRef.current.getContext('2d');
         const size = width;
-        const scale = size / 1200; 
+        const scale = size / WHEEL_CONFIG.REFERENCE_SIZE; 
 
         if (offscreenCanvasRef.current.width !== size || offscreenCanvasRef.current.height !== size) {
              offscreenCanvasRef.current.width = size;
@@ -77,7 +78,7 @@ const WheelCanvas = ({ items, onSpinEnd, isSpinning, spinTrigger, width = 500, h
         }
 
         const center = size / 2;
-        const radius = size / 2 - (20 * scale);
+        const radius = size / 2 - (WHEEL_CONFIG.DIMENSIONS.INNER_RADIUS_OFFSET * scale);
         const arc = (2 * Math.PI) / items.length;
         const chord = 2 * radius * Math.sin(arc / 2);
         
@@ -87,14 +88,14 @@ const WheelCanvas = ({ items, onSpinEnd, isSpinning, spinTrigger, width = 500, h
         // Outer Rim
         ctx.save();
         ctx.beginPath();
-        ctx.arc(0, 0, radius + (15 * scale), 0, 2 * Math.PI);
-        const rimGradient = ctx.createRadialGradient(0, 0, radius, 0, 0, radius + (15 * scale));
-        rimGradient.addColorStop(0, '#1e1b4b');
-        rimGradient.addColorStop(0.5, '#4c1d95');
-        rimGradient.addColorStop(1, '#000');
+        ctx.arc(0, 0, radius + (WHEEL_CONFIG.DIMENSIONS.OUTER_RIM_OFFSET * scale), 0, 2 * Math.PI);
+        const rimGradient = ctx.createRadialGradient(0, 0, radius, 0, 0, radius + (WHEEL_CONFIG.DIMENSIONS.OUTER_RIM_OFFSET * scale));
+        rimGradient.addColorStop(0, WHEEL_CONFIG.COLORS.OUTER_RIM_START);
+        rimGradient.addColorStop(0.5, WHEEL_CONFIG.COLORS.OUTER_RIM_MID);
+        rimGradient.addColorStop(1, WHEEL_CONFIG.COLORS.OUTER_RIM_END);
         ctx.fillStyle = rimGradient;
         ctx.fill();
-        ctx.strokeStyle = 'rgba(139, 92, 246, 0.5)';
+        ctx.strokeStyle = WHEEL_CONFIG.COLORS.STROKE;
         ctx.lineWidth = 2 * scale;
         ctx.stroke();
         ctx.restore();
@@ -132,16 +133,16 @@ const WheelCanvas = ({ items, onSpinEnd, isSpinning, spinTrigger, width = 500, h
                 
                 ctx.drawImage(img, -imgW/2, -radius, imgW, imgH);
             } else {
-                const segGradient = ctx.createRadialGradient(0, 0, 50 * scale, 0, 0, radius);
-                segGradient.addColorStop(0, adjustColorBrightness(color, -40));
+                const segGradient = ctx.createRadialGradient(0, 0, WHEEL_CONFIG.DIMENSIONS.DONUT_INNER_MIN * scale, 0, 0, radius);
+                segGradient.addColorStop(0, adjustColorBrightness(color, WHEEL_CONFIG.COLOR_ADJUSTMENT.DARKEN_AMOUNT));
                 segGradient.addColorStop(1, color);
                 
                 ctx.fillStyle = segGradient;
                 ctx.fill();
             }
             
-            ctx.strokeStyle = 'rgba(0,0,0,0.5)';
-            ctx.lineWidth = 1 * scale;
+            ctx.strokeStyle = WHEEL_CONFIG.COLORS.STROKE_DARK;
+            ctx.lineWidth = WHEEL_CONFIG.DIMENSIONS.SHADOW_OFFSET_X * scale;
             ctx.stroke();
 
             if (!img) {
@@ -150,19 +151,19 @@ const WheelCanvas = ({ items, onSpinEnd, isSpinning, spinTrigger, width = 500, h
                                  Math.sin(segmentAngle + arc / 2) * (radius * 0.65));
                 ctx.rotate(segmentAngle + arc / 2);
                 ctx.fillStyle = '#FFFFFF';
-                const calculatedFontSize = fontSize || (24 * scale);
+                const calculatedFontSize = fontSize || (WHEEL_CONFIG.FONT_SIZE.MOVIE * scale);
                 ctx.font = `bold ${calculatedFontSize}px Outfit, sans-serif`; 
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
                 
-                ctx.shadowColor = "rgba(0,0,0,0.9)";
-                ctx.shadowBlur = 4 * scale;
-                ctx.shadowOffsetX = 1 * scale;
-                ctx.shadowOffsetY = 1 * scale;
+                ctx.shadowColor = WHEEL_CONFIG.COLORS.TEXT_SHADOW;
+                ctx.shadowBlur = WHEEL_CONFIG.DIMENSIONS.SHADOW_BLUR * scale;
+                ctx.shadowOffsetX = WHEEL_CONFIG.DIMENSIONS.SHADOW_OFFSET_X * scale;
+                ctx.shadowOffsetY = WHEEL_CONFIG.DIMENSIONS.SHADOW_OFFSET_Y * scale;
                 
                 const maxWidth = radius * 0.6;
                 const label = typeof item === 'string' ? item : (item.label || item);
-                wrapText(ctx, label, 0, 0, maxWidth, calculatedFontSize + (4 * scale));
+                wrapText(ctx, label, 0, 0, maxWidth, calculatedFontSize + (WHEEL_CONFIG.DIMENSIONS.LINE_HEIGHT_OFFSET * scale));
                 
                 ctx.restore();
             }
@@ -182,9 +183,9 @@ const WheelCanvas = ({ items, onSpinEnd, isSpinning, spinTrigger, width = 500, h
     // Main Draw Function (Animation Loop)
     const draw = (ctx, angle) => {
         const size = ctx.canvas.width;
-        const scale = size / 1200;
+        const scale = size / WHEEL_CONFIG.REFERENCE_SIZE;
         const center = size / 2;
-        const radius = size / 2 - (20 * scale);
+        const radius = size / 2 - (WHEEL_CONFIG.DIMENSIONS.INNER_RADIUS_OFFSET * scale);
 
         ctx.clearRect(0, 0, size, size);
 
@@ -197,10 +198,10 @@ const WheelCanvas = ({ items, onSpinEnd, isSpinning, spinTrigger, width = 500, h
         }
 
         const chord = 2 * radius * Math.sin((2 * Math.PI) / items.length / 2);
-        const expectedPosterHeight = chord * 1.5;
+        const expectedPosterHeight = chord * WHEEL_CONFIG.DIMENSIONS.POSTER_ASPECT_RATIO;
         let calculatedInner = radius - expectedPosterHeight;
-        if (calculatedInner < 50 * scale) calculatedInner = 50 * scale;
-        const innerRadius = isDonut ? calculatedInner : (80 * scale);
+        if (calculatedInner < WHEEL_CONFIG.DIMENSIONS.DONUT_INNER_MIN * scale) calculatedInner = WHEEL_CONFIG.DIMENSIONS.DONUT_INNER_MIN * scale;
+        const innerRadius = isDonut ? calculatedInner : (WHEEL_CONFIG.DIMENSIONS.DONUT_INNER_DEFAULT * scale);
 
         if (isDonut) {
             const idx = getIndexAtTop(angle, items.length);
@@ -211,9 +212,9 @@ const WheelCanvas = ({ items, onSpinEnd, isSpinning, spinTrigger, width = 500, h
             ctx.translate(center, center);
             ctx.beginPath();
             ctx.arc(0, 0, innerRadius, 0, 2 * Math.PI);
-            ctx.fillStyle = '#050511'; 
+            ctx.fillStyle = WHEEL_CONFIG.COLORS.CENTER_BG; 
             ctx.fill();
-            ctx.strokeStyle = 'rgba(139, 92, 246, 0.5)';
+            ctx.strokeStyle = WHEEL_CONFIG.COLORS.STROKE;
             ctx.lineWidth = 4 * scale;
             ctx.stroke();
             
@@ -242,28 +243,28 @@ const WheelCanvas = ({ items, onSpinEnd, isSpinning, spinTrigger, width = 500, h
                  ctx.restore();
             } else if (centerItem) {
                 ctx.fillStyle = '#FFF';
-                ctx.font = `bold ${40 * scale}px Outfit, sans-serif`;
+                ctx.font = `bold ${WHEEL_CONFIG.FONT_SIZE.CENTER_LABEL * scale}px Outfit, sans-serif`;
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
                 const label = (typeof centerItem === 'string') ? centerItem : (centerItem.label || centerItem);
-                wrapText(ctx, label, 0, 0, innerRadius * 1.5, (40 * scale) + (5 * scale));
+                wrapText(ctx, label, 0, 0, innerRadius * 1.5, (40 * scale) + (WHEEL_CONFIG.DIMENSIONS.CENTER_LABEL_PADDING * scale));
             }
             ctx.restore();
         } else {
             ctx.save();
             ctx.translate(center, center);
             ctx.beginPath();
-            const innerRingSize = 80 * scale;
+            const innerRingSize = WHEEL_CONFIG.DIMENSIONS.INNER_RING_SIZE * scale;
             ctx.arc(0, 0, innerRingSize, 0, 2 * Math.PI);
-            ctx.fillStyle = 'rgba(0,0,0,0.3)';
+            ctx.fillStyle = WHEEL_CONFIG.COLORS.INNER_RING_FILL;
             ctx.fill();
             ctx.restore();
         }
 
         const shineGradient = ctx.createLinearGradient(0, 0, size, size);
-        shineGradient.addColorStop(0, 'rgba(255,255,255,0.05)');
-        shineGradient.addColorStop(0.5, 'rgba(255,255,255,0)');
-        shineGradient.addColorStop(1, 'rgba(255,255,255,0.02)');
+        shineGradient.addColorStop(0, WHEEL_CONFIG.COLORS.SHINE_START);
+        shineGradient.addColorStop(0.5, WHEEL_CONFIG.COLORS.SHINE_MID);
+        shineGradient.addColorStop(1, WHEEL_CONFIG.COLORS.SHINE_END);
         ctx.fillStyle = shineGradient;
         ctx.beginPath();
         ctx.arc(center, center, radius, 0, 2 * Math.PI);
@@ -271,9 +272,9 @@ const WheelCanvas = ({ items, onSpinEnd, isSpinning, spinTrigger, width = 500, h
         ctx.fill();
         
         ctx.beginPath();
-        ctx.arc(center, center, radius - 2 * scale, 0, 2 * Math.PI);
-        ctx.strokeStyle = 'rgba(255,255,255,0.1)';
-        ctx.lineWidth = 2 * scale;
+        ctx.arc(center, center, radius - WHEEL_CONFIG.DIMENSIONS.STROKE_WIDTH * scale, 0, 2 * Math.PI);
+        ctx.strokeStyle = WHEEL_CONFIG.COLORS.STROKE_LIGHT;
+        ctx.lineWidth = WHEEL_CONFIG.DIMENSIONS.STROKE_WIDTH * scale;
         ctx.stroke();
     };
 
@@ -293,14 +294,14 @@ const WheelCanvas = ({ items, onSpinEnd, isSpinning, spinTrigger, width = 500, h
         const animate = (time) => {
             const state = stateRef.current;
             if (state.isSpinning) {
-                if (state.velocity < 0.002) {
+                if (state.velocity < WHEEL_CONFIG.PHYSICS.STOP_VELOCITY) {
                     state.isSpinning = false;
                     state.velocity = 0;
                     const winner = determineWinner(state.angle);
                     onSpinEnd(winner);
                 } else {
                     state.angle += state.velocity;
-                    state.velocity *= 0.985; 
+                    state.velocity *= WHEEL_CONFIG.PHYSICS.FRICTION; 
                     state.angle %= (2 * Math.PI);
                 }
             }
@@ -316,7 +317,7 @@ const WheelCanvas = ({ items, onSpinEnd, isSpinning, spinTrigger, width = 500, h
              const state = stateRef.current;
              if (!state.isSpinning) {
                  state.isSpinning = true;
-                 state.velocity = Math.random() * 0.2 + 0.4;
+                 state.velocity = Math.random() * WHEEL_CONFIG.PHYSICS.RANDOM_VELOCITY_FACTOR + WHEEL_CONFIG.PHYSICS.BASE_VELOCITY;
              }
         }
     }, [spinTrigger]);

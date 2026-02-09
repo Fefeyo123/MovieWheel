@@ -5,7 +5,7 @@ import ModalsContainer from './components/common/ModalsContainer';
 import Header from './components/common/Header';
 import ResultModal from './components/modals/ResultModal';
 import { supabase } from './utils/supabaseClient';
-import { THE_BOIS, GENRE_COLORS } from './utils/constants';
+import { THE_BOIS, GENRE_COLORS, ANIMATION, WHEEL_CONFIG } from './utils/constants';
 import { parseGenre, preloadImages } from './utils/helpers';
 import useWheelData from './hooks/useWheelData';
 import { UIProvider, useUI } from './context/UIContext';
@@ -101,24 +101,70 @@ function AppContent() {
         };
     }, []);
 
-    const onGenreSpinEnd = React.useCallback(async (genre) => {
+const onGenreSpinEnd = React.useCallback(async (genre) => {
         setSelectedGenre(genre);
         
         if (timeoutRef.current) clearTimeout(timeoutRef.current);
         
-        // Filter movies matching the selected genre
+        // 1. Filter movies matching the selected genre
         const relevantMovies = queuedMovies.filter(m => {
              const g = m.genre; 
              return Array.isArray(g) ? g.includes(genre) : g === genre;
         });
 
-        // Collect poster paths
+        // 2. CHECK: Is er maar 1 unieke uitkomst? (1 losse film OF 1 collectie)
+        const distinctItems = new Set();
+        relevantMovies.forEach(m => {
+            if (m.collection_name) {
+                // Heeft deze collectie meer dan 1 film in deze genre-filter?
+                const countInCollection = relevantMovies.filter(rm => rm.collection_name === m.collection_name).length;
+                if (countInCollection > 1) {
+                    distinctItems.add(m.collection_name); // Telt als 1 groep
+                } else {
+                    distinctItems.add(m.title); // Telt als losse film
+                }
+            } else {
+                distinctItems.add(m.title); // Telt als losse film
+            }
+        });
+
+        // 3. SKIP SCENARIO: Maar 1 vakje? Sla het filmwiel over!
+        if (distinctItems.size === 1) {
+             // Bepaal wie de echte winnaar is (het object)
+             let winner = relevantMovies[0];
+             
+             // Als het een collectie is (meerdere films), pak de oudste
+             if (relevantMovies.length > 1) {
+                 winner = [...relevantMovies].sort((a, b) => {
+                    if (!a.release_date) return -1;
+                    if (!b.release_date) return 1;
+                    return new Date(a.release_date) - new Date(b.release_date);
+                })[0];
+             }
+
+             // UX Delay + Preload alleen de winnaar
+             const delay = new Promise(resolve => setTimeout(resolve, ANIMATION.DELAY.WHEEL_IMAGE_PRELOAD));
+             
+             let winnerImagePromise = Promise.resolve();
+             if (winner.poster_path) {
+                 winnerImagePromise = preloadImages([winner.poster_path]);
+             }
+
+             await Promise.all([delay, winnerImagePromise]);
+
+             // Ga direct naar resultaat
+             setSelectedMovie(winner);
+             setPhase('result');
+             setSpinTrigger(0);
+             return; 
+        }
+
+        // 4. STANDARD SCENARIO: Meerdere opties -> Laad het Movie Wiel
         const paths = relevantMovies
             .map(m => m.poster_path)
             .filter(path => path);
 
-        // Preload images with a minimum delay for UX
-        const minDelay = new Promise(resolve => setTimeout(resolve, 800));
+        const minDelay = new Promise(resolve => setTimeout(resolve, ANIMATION.DELAY.WHEEL_IMAGE_PRELOAD));
         const imageLoading = preloadImages(paths);
 
         const [_, loadedImagesMap] = await Promise.all([minDelay, imageLoading]);
@@ -126,7 +172,7 @@ function AppContent() {
         // Update image cache
         setImageCache(prev => ({ ...prev, ...loadedImagesMap }));
 
-        // Transition to next phase
+        // Transition to movie wheel
         setPhase('movies');
         setSpinTrigger(0); 
     }, [queuedMovies]);
@@ -154,7 +200,7 @@ function AppContent() {
                 setSelectedMovie(movie); 
             }
             setPhase('result');
-        }, 1000);
+        }, ANIMATION.DELAY.RESULT_REVEAL);
     }, [queuedMovies, selectedGenre]);
 
     const reset = () => {
@@ -248,7 +294,7 @@ function AppContent() {
                 {/* Unified Wheel Container */}
                 <motion.div 
                     layout
-                    transition={{ duration: 0.8, ease: [0.2, 0.8, 0.2, 1] }}
+                    transition={{ duration: ANIMATION.DURATION.WHEEL_ENTRY, ease: ANIMATION.EASING.WHEEL_ENTRY }}
                     className={`z-20
                             ${isGenrePhase 
                                 ? 'relative w-[90vw] max-w-[400px] aspect-square' 
@@ -285,9 +331,9 @@ function AppContent() {
                                     imageCache={imageCache}
                                     onSpinEnd={isGenrePhase ? onGenreSpinEnd : onMovieSpinEnd}
                                     spinTrigger={spinTrigger}
-                                    width={1500}
-                                    height={1500}
-                                    fontSize={isGenrePhase ? 70 : 24}
+                                    width={WHEEL_CONFIG.DEFAULT_SIZE}
+                                    height={WHEEL_CONFIG.DEFAULT_SIZE}
+                                    fontSize={isGenrePhase ? WHEEL_CONFIG.FONT_SIZE.GENRE : WHEEL_CONFIG.FONT_SIZE.MOVIE}
                                     colors={isGenrePhase ? GENRE_COLORS : undefined}
                                     isDonut={!isGenrePhase}
                                 />

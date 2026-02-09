@@ -1,3 +1,5 @@
+import { TMDB_CONFIG } from './constants';
+
 export const parseGenre = (genreData) => {
     if (!genreData) return [];
     if (Array.isArray(genreData)) return genreData;
@@ -70,7 +72,7 @@ export const preloadImages = (posterPaths) => {
             const img = new Image();
             // Zorg voor exact hetzelfde pad als in WheelCanvas
             const cleanPath = path.startsWith('/') ? path : `/${path}`;
-            const fullUrl = `https://image.tmdb.org/t/p/w780${cleanPath}`;
+            const fullUrl = `${TMDB_CONFIG.IMAGE_BASE_URL}${TMDB_CONFIG.POSTER_SIZE}${cleanPath}`;
             
             img.src = fullUrl;
             
