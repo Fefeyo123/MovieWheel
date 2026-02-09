@@ -232,14 +232,15 @@ function AppContent() {
                 <motion.div 
                     layout
                     transition={{ type: "spring", stiffness: 40, damping: 15 }}
-                    className={`z-20 left-1/2 -translate-x-1/2
-                        ${isGenrePhase 
-                            // Genre fase: netjes in het midden, niet te groot
-                            ? 'relative w-[90vw] max-w-[400px] aspect-square' 
-                            // Film fase: Vast aan de onderkant, breedte vult scherm + beetje extra voor de curve
-                            : 'fixed bottom-[-45vw] w-[120vw] h-[120vw] sm:bottom-[-35vh] sm:w-[100vh] sm:h-[100vh]'
-                        }
-                    `}
+                    className={`z-20
+                            ${isGenrePhase 
+                                // Genre fase: GEEN left/translate, Flexbox centreert hem al
+                                ? 'relative w-[90vw] max-w-[400px] aspect-square' 
+                                
+                                // Film fase: WEL left/translate nodig omdat hij 'fixed' is
+                                : 'fixed bottom-[-45vw] left-1/2 -translate-x-1/2 w-[120vw] h-[120vw] sm:bottom-[-35vh] sm:w-[100vh] sm:h-[100vh]'
+                            }
+                        `}
                 >
                      {/* Static decorations that scale with container */}
                     <div className={`absolute -top-[25px] left-1/2 -translate-x-1/2 z-10 drop-shadow-md pointer-events-none transition-all duration-1000
