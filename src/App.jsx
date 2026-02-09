@@ -13,7 +13,8 @@ import './index.css';
 
 function AppContent() {
     const { confirm, alert } = useUI();
-    const [phase, setPhase] = useState('genre'); // genre | movies | result
+    const [phase, setPhase] = useState('genre');
+    const [isLoading, setIsLoading] = useState(true);
     const [selectedGenre, setSelectedGenre] = useState(null);
     const [selectedMovie, setSelectedMovie] = useState(null);
     const [spinTrigger, setSpinTrigger] = useState(0);
@@ -84,6 +85,7 @@ function AppContent() {
             }));
             setMovies(normalized);
         }
+        setIsLoading(false);
     };
 
     const handleSpin = () => {
@@ -239,6 +241,7 @@ function AppContent() {
                 isGenrePhase={isGenrePhase}
                 selectedGenre={selectedGenre}
                 hasAvailableGenres={availableGenres.length > 0}
+                isLoading={isLoading}
             />
 
             <main className="w-full flex-grow relative flex flex-col items-center justify-center">
@@ -253,75 +256,86 @@ function AppContent() {
                             }
                         `}
                 >
-                     {/* Static decorations */}
+
+                    {/* Static decorations */}
                     <div className={`absolute -top-[25px] left-1/2 -translate-x-1/2 z-10 drop-shadow-md pointer-events-none transition-all duration-1000
-                         ${isGenrePhase 
+                        ${isGenrePhase 
                             ? 'w-[40px] h-[50px]' 
                             : 'w-[40px] h-[50px] -top-[25px]'
-                         }
+                        }
                     `}>
                         {/* Pointer Graphic */}
                         <div className="w-full h-full relative">
                             <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[10%] h-full bg-gradient-to-b from-neon-accent to-white rounded-sm shadow-[0_0_10px_var(--neon-accent)]"></div>
-                             <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[50%] aspect-square bg-bg-dark border-2 border-neon-accent rounded-md rotate-45 shadow-[0_0_10px_var(--neon-accent)]"></div>
+                            <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[50%] aspect-square bg-bg-dark border-2 border-neon-accent rounded-md rotate-45 shadow-[0_0_10px_var(--neon-accent)]"></div>
                         </div>
                     </div>
-
-                    <div className="w-full h-full transition-opacity duration-300 ease-in-out" style={{ opacity: wheelOpacity }}>
-                        <WheelCanvas 
-                            items={currentWheelItems} 
-                            imageCache={imageCache}
-                            onSpinEnd={isGenrePhase ? onGenreSpinEnd : onMovieSpinEnd}
-                            spinTrigger={spinTrigger}
-                            width={1500}
-                            height={1500}
-                            fontSize={isGenrePhase ? 70 : 24}
-                            colors={isGenrePhase ? GENRE_COLORS : undefined}
-                            isDonut={!isGenrePhase}
-                        />
-                    </div>
-
-                    {/* Spin Button */}
-                    <motion.button 
-                        onClick={handleSpin}
-                        whileHover={{ scale: 1.1 }}
-                        whileTap={{ scale: 0.9 }} 
-                        className={`absolute left-1/2 -translate-x-1/2 rounded-full cursor-pointer z-30 flex items-center justify-center transition-all duration-1000 group
-                            ${isGenrePhase 
-                                ? 'top-1/2 -translate-y-1/2 w-[90px] h-[90px] sm:w-[110px] sm:h-[110px]'
-                                : '-top-[110px] w-[80px] h-[80px] sm:-top-[140px] sm:w-[100px] sm:h-[100px]'
-                            }
-                        `}
-                    >
-                        {/* Outer Glow Ring */}
-                        <div className={`absolute inset-0 rounded-full transition-all duration-500
-                            bg-gradient-to-br from-neon-primary/80 to-neon-secondary/80
-                            shadow-[0_0_30px_rgba(217,70,239,0.4),inset_0_0_20px_rgba(255,255,255,0.2)]
-                            group-hover:shadow-[0_0_50px_rgba(217,70,239,0.7),inset_0_0_30px_rgba(255,255,255,0.4)]
-                            border border-white/20 backdrop-blur-sm
-                        `}></div>
-
-                        {/* Inner Dark Circle */}
-                        <div className="absolute inset-[6px] rounded-full bg-[#0a0a0c] shadow-[inset_0_4px_10px_rgba(0,0,0,0.8)] flex items-center justify-center overflow-hidden">
-                             {/* Glossy overlay */}
-                             <div className="absolute top-0 left-0 w-full h-1/2 bg-gradient-to-b from-white/10 to-transparent pointer-events-none"></div>
-                             
-                             <span className={`font-black text-white tracking-widest transition-all duration-300 group-hover:text-neon-primary group-hover:scale-110
-                                ${isGenrePhase ? 'text-xl sm:text-2xl' : 'text-lg'}
-                             `}>
-                                SPIN
-                             </span>
+                    {isLoading ? (
+                        // A. LAAD SCHERM (Centraal in de cirkel)
+                        <div className="absolute inset-0 flex items-center justify-center">
+                            {/* Een simpele, stijlvolle spinner */}
+                            <div className="w-16 h-16 border-4 border-white/20 border-t-neon-primary rounded-full animate-spin"></div>
                         </div>
-                    </motion.button>
-                    
-                    {/* Shadow/Glow behind wheel */}
-                    <div 
-                         className={`absolute inset-0 rounded-full transition-shadow duration-1000 -z-10
-                         ${isGenrePhase 
-                            ? 'shadow-[0_0_40px_rgba(139,92,246,0.2)]' 
-                            : 'shadow-[0_0_100px_rgba(139,92,246,0.2)]'
-                         }
-                    `}></div>
+                    ) : (
+                        // B. HET WIEL EN DE KNOP (Alleen tonen als data er is)
+                        <>
+                            <div className="w-full h-full transition-opacity duration-300 ease-in-out" style={{ opacity: wheelOpacity }}>
+                                <WheelCanvas 
+                                    items={currentWheelItems} 
+                                    imageCache={imageCache}
+                                    onSpinEnd={isGenrePhase ? onGenreSpinEnd : onMovieSpinEnd}
+                                    spinTrigger={spinTrigger}
+                                    width={1500}
+                                    height={1500}
+                                    fontSize={isGenrePhase ? 70 : 24}
+                                    colors={isGenrePhase ? GENRE_COLORS : undefined}
+                                    isDonut={!isGenrePhase}
+                                />
+                            </div>
+
+                            {/* Spin Button */}
+                            <motion.button 
+                                onClick={handleSpin}
+                                whileHover={{ scale: 1.1 }}
+                                whileTap={{ scale: 0.9 }} 
+                                className={`absolute left-1/2 -translate-x-1/2 rounded-full cursor-pointer z-30 flex items-center justify-center transition-all duration-1000 group
+                                    ${isGenrePhase 
+                                        ? 'top-1/2 -translate-y-1/2 w-[90px] h-[90px] sm:w-[110px] sm:h-[110px]'
+                                        : '-top-[110px] w-[80px] h-[80px] sm:-top-[140px] sm:w-[100px] sm:h-[100px]'
+                                    }
+                                `}
+                            >
+                                {/* Outer Glow Ring */}
+                                <div className={`absolute inset-0 rounded-full transition-all duration-500
+                                    bg-gradient-to-br from-neon-primary/80 to-neon-secondary/80
+                                    shadow-[0_0_30px_rgba(217,70,239,0.4),inset_0_0_20px_rgba(255,255,255,0.2)]
+                                    group-hover:shadow-[0_0_50px_rgba(217,70,239,0.7),inset_0_0_30px_rgba(255,255,255,0.4)]
+                                    border border-white/20 backdrop-blur-sm
+                                `}></div>
+
+                                {/* Inner Dark Circle */}
+                                <div className="absolute inset-[6px] rounded-full bg-[#0a0a0c] shadow-[inset_0_4px_10px_rgba(0,0,0,0.8)] flex items-center justify-center overflow-hidden">
+                                    {/* Glossy overlay */}
+                                    <div className="absolute top-0 left-0 w-full h-1/2 bg-gradient-to-b from-white/10 to-transparent pointer-events-none"></div>
+                                    
+                                    <span className={`font-black text-white tracking-widest transition-all duration-300 group-hover:text-neon-primary group-hover:scale-110
+                                        ${isGenrePhase ? 'text-xl sm:text-2xl' : 'text-lg'}
+                                    `}>
+                                        SPIN
+                                    </span>
+                                </div>
+                            </motion.button>
+                            
+                            {/* Shadow/Glow behind wheel */}
+                            <div 
+                                className={`absolute inset-0 rounded-full transition-shadow duration-1000 -z-10
+                                ${isGenrePhase 
+                                    ? 'shadow-[0_0_40px_rgba(139,92,246,0.2)]' 
+                                    : 'shadow-[0_0_100px_rgba(139,92,246,0.2)]'
+                                }
+                            `}></div>
+                        </>
+                    )}
                 </motion.div>
 
                 {phase === 'result' && (

@@ -7,7 +7,8 @@ const Header = ({
     queueCount, 
     isGenrePhase, 
     selectedGenre, 
-    hasAvailableGenres 
+    hasAvailableGenres,
+    isLoading
 }) => {
     const { 
         selectedUser, 
@@ -57,7 +58,7 @@ const Header = ({
                         transition={{ type: "spring", stiffness: 400, damping: 10 }}
                     >
                         <span className="material-symbols-outlined text-[18px]">list</span>
-                        Queue ({queueCount})
+                        Queue ({isLoading ? '...' : queueCount})
                     </motion.button>
                 </div>
             </div>
@@ -72,7 +73,7 @@ const Header = ({
             {/* Header Text Transition */}
             <div className={`transition-all duration-500 mt-4 sm:mt-8 ${!isGenrePhase ? 'opacity-0 translate-y-[-20px] pointer-events-none absolute w-full' : 'opacity-100 translate-y-0 relative'}`}>
                  <h2 className="font-normal text-2xl sm:text-3xl text-text-main">
-                    {hasAvailableGenres ? "Pick a Genre" : "Add movies to start!"}
+                    {isLoading ? 'Loading genres...' : hasAvailableGenres ? "Pick a Genre" : "Add movies to start!"}
                 </h2>
             </div>
 
