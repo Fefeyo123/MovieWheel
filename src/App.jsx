@@ -238,7 +238,7 @@ function AppContent() {
                                 ? 'relative w-[90vw] max-w-[400px] aspect-square' 
                                 
                                 // Film fase: WEL left/translate nodig omdat hij 'fixed' is
-                                : 'fixed bottom-[-45vw] left-1/2 -translate-x-1/2 w-[120vw] h-[120vw] sm:bottom-[-35vh] sm:w-[100vh] sm:h-[100vh]'
+                                : 'fixed bottom-[-40vw] left-1/2 -translate-x-1/2 w-[120vw] h-[120vw] sm:bottom-[-50vh] sm:w-[100vh] sm:h-[100vh]'
                             }
                         `}
                 >
