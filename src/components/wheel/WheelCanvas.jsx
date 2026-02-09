@@ -146,8 +146,8 @@ const WheelCanvas = ({ items, onSpinEnd, isSpinning, spinTrigger, width = 500, h
 
             if (!img) {
                 ctx.save();
-                ctx.translate(Math.cos(segmentAngle + arc / 2) * (radius * 0.75), 
-                                 Math.sin(segmentAngle + arc / 2) * (radius * 0.75));
+                ctx.translate(Math.cos(segmentAngle + arc / 2) * (radius * 0.65), 
+                                 Math.sin(segmentAngle + arc / 2) * (radius * 0.65));
                 ctx.rotate(segmentAngle + arc / 2);
                 ctx.fillStyle = '#FFFFFF';
                 const calculatedFontSize = fontSize || (24 * scale);
